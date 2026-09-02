@@ -19,13 +19,14 @@ export function createClock() {
  * Avança os ponteiros. `dt` já vem clampado pelo loop, então uma volta do
  * background não faz o relógio saltar mais do que o passo fixo permite.
  */
-export function advance(clock, dt) {
+export function advance(clock, dt, speedMul = 1) {
   clock.prevSecond = clock.second;
   clock.prevMinute = clock.minute;
   clock.prevHour = clock.hour;
 
-  clock.second = norm(clock.second + B.hands.second.speed * dt);
-  clock.minute = norm(clock.minute + B.hands.minute.speed * dt);
+  // O ponteiro das horas nunca escala: ele mede a partida (SPEC §5, §9).
+  clock.second = norm(clock.second + B.hands.second.speed * speedMul * dt);
+  clock.minute = norm(clock.minute + B.hands.minute.speed * speedMul * dt);
   clock.hour   = norm(clock.hour   + B.hands.hour.speed   * dt);
 
   const era = clock.midnight;

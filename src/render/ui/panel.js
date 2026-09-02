@@ -70,16 +70,26 @@ export function createPanel({ input, canAfford, canPlaceAt, onPlace }) {
     terminar(false);
   });
 
-  let saldoAnterior = -1;
+  let anterior = '';
 
   return {
     drag,
 
-    /** Acende ou apaga as cartas conforme o saldo. Só toca o DOM na mudança. */
-    update(eco) {
-      if (eco.gears === saldoAnterior) return;
-      saldoAnterior = eco.gears;
-      for (const c of cartas) c.disabled = !canAfford(PIECES[c.dataset.type].cost);
+    /**
+     * Acende ou apaga as cartas conforme saldo e tipos liberados. Peça ainda
+     * não liberada fica apagada e sem preço — a loja é o portão dos tipos.
+     */
+    update(eco, run) {
+      const chave = `${eco.gears}|${[...run.unlocked].sort().join(',')}`;
+      if (chave === anterior) return;
+      anterior = chave;
+      for (const c of cartas) {
+        const tipo = c.dataset.type;
+        const liberada = run.unlocked.has(tipo);
+        c.disabled = !liberada || !canAfford(PIECES[tipo].cost);
+        c.classList.toggle('travada', !liberada);
+        c.querySelector('.custo').textContent = liberada ? String(PIECES[tipo].cost) : '—';
+      }
     },
   };
 }

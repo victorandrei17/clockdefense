@@ -33,7 +33,7 @@ function midnightColumns() {
 
 const PANEL_HZ = 10; // o painel é diagnóstico, não precisa de 60 fps
 
-export function createDebug({ clock, pieces, enemies, eco }) {
+export function createDebug({ clock, pieces, enemies, eco, run }) {
   const el = document.getElementById('debug');
   const columns = midnightColumns();
   const shortcuts = [];
@@ -99,8 +99,10 @@ export function createDebug({ clock, pieces, enemies, eco }) {
         (clock.midnight ? 'MEIA-NOITE' : `próxima em ${untilMidnight(clock).toFixed(1)}s`),
         `meia-noites ${clock.midnights}  colunas ${columns.map((c) => `${c}°`).join(' ')}`,
         `peças ${pieces.length}  inimigos ${enemies.alive()}/${enemies.size}  efeitos ${fxAlive()}`,
-        `corda ${eco.wind.toFixed(1)}  dreno ${drainRate(eco).toFixed(2)}/s  ` +
+        `corda ${eco.wind.toFixed(1)}/${eco.windMax}  dreno ${drainRate(run.hour).toFixed(2)}/s  ` +
         `engr ${eco.gears}  mortes ${eco.kills}${eco.invincible ? '  INVENCÍVEL' : ''}`,
+        `fase ${run.phase}  hora ${run.hour} (${run.hourTime.toFixed(1)}s)  ` +
+        `ponteiros ×${(1 + run.speedBonus).toFixed(2)}  liberadas ${[...run.unlocked].join(',')}`,
       ];
       if (p) {
         lines.push(

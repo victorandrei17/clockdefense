@@ -3,13 +3,19 @@ import { BALANCE } from './data/balance.js';
 import { createClock, advance } from './game/clock.js';
 import { createPiece, updatePieces, canPlace, pieceAt, upgrade, upgradeCost, sellValue } from './game/pieces.js';
 import { createEnemies, updateEnemies, damage } from './game/enemies.js';
-import { createEconomy, tick as tickEconomy, spend, creditKill, pay, refund } from './game/economy.js';
+import { createEconomy, tick as tickEconomy, spend, creditKill, pay, refund, gainWindMax } from './game/economy.js';
 import { createSpawner, updateSpawner, spawnGroup } from './game/spawner.js';
 import { createHud } from './render/ui/hud.js';
 import { createPanel } from './render/ui/panel.js';
 import { createPopover } from './render/ui/popover.js';
 import { createInput } from './core/input.js';
 import { PIECES } from './data/pieces.data.js';
+import { BALANCE as B } from './data/balance.js';
+import { createRun, tickHour, hourBonus, nextHour, isLastHour, handSpeed } from './game/run.js';
+import * as rngMod from './util/rng.js';
+import { createShop, open as openShop, roll, rerollCost, cardCost } from './game/shop.js';
+import { createShopUi } from './render/ui/shop.js';
+import { createScreens } from './render/ui/screens.js';
 import { innerSlots, outerSlots } from './game/board.js';
 import { createRenderer } from './render/renderer.js';
 import { createDebug } from './render/debug.js';
@@ -32,6 +38,8 @@ const clock = createClock();
 const enemies = createEnemies();
 const eco = createEconomy();
 const spawner = createSpawner();
+const run = createRun();
+const shop = createShop();
 
 // O mostrador começa vazio: a partir do M4 quem monta é o jogador, com as
 // engrenagens iniciais e as que ganhar matando.
@@ -40,11 +48,13 @@ const pieces = [];
 const renderer = createRenderer(ctx, VIEW);
 const hud = createHud();
 const input = createInput(canvas, VIEW);
-const debug = createDebug({ clock, pieces, enemies, eco });
+const debug = createDebug({ clock, pieces, enemies, eco, run });
 
 /** Cabe a peça aqui, e dá para pagar? Usado pelo painel e pelo renderer. */
 function canPlaceAt(type, ring, slotIndex) {
-  return eco.gears >= PIECES[type].cost && canPlace(type, ring, slotIndex, pieces);
+  return run.unlocked.has(type)
+    && eco.gears >= PIECES[type].cost
+    && canPlace(type, ring, slotIndex, pieces);
 }
 
 const panel = createPanel({
@@ -160,20 +170,27 @@ function sampleRate(now) {
 function update(dt) {
   ticks++;
 
-  if (eco.alive) {
-    if (!debug.handsPaused) advance(clock, dt);
+  // Só a fase 'run' faz o mundo andar. Na loja o jogo fica parado de
+  // verdade — nada de loja em tempo real, que no celular é hostil (SPEC §9).
+  if (run.phase === 'run') {
+    if (!debug.handsPaused) advance(clock, dt, handSpeed(run));
 
-    tickEconomy(eco, dt);
+    tickEconomy(eco, dt, run.hour);
     updateSpawner(spawner, enemies, dt);
     updateEnemies(enemies, dt, onReach);
     updatePieces(pieces, clock, dt, world);
     if (clock.midnightStarted) spawnMidnight(clock.midnightAngle);
+
+    if (!eco.alive) terminar();
+    else if (tickHour(run, dt)) fecharHora();
   }
 
   updateFx(dt);
-  hud.update(eco);
-  panel.update(eco);
+  hud.update(eco, run);
+  panel.update(eco, run);
   popover.update(eco, scale);
+  shopUi.update(run, shop, eco);
+  mostrarHud(run.phase === 'run');
   debug.update(dt, lastFps, lastUps);
 }
 
@@ -198,14 +215,93 @@ function onReach(e) {
   spawnFlash(e.x, e.y, 30);
 }
 
-function restart() {
+// --- ciclo da partida ---------------------------------------------------
+
+function comecar() {
+  Object.assign(run, createRun());
   Object.assign(eco, createEconomy());
   Object.assign(spawner, createSpawner());
   Object.assign(clock, createClock());
   enemies.clear();
   pieces.length = 0;
   popover.fechar();
+  shopUi.fechar();
+  screens.esconderFim();
+  screens.mostrarMenu(false);
+  run.phase = 'run';
 }
+
+/** A hora fechou: paga o bônus, encerra a onda e abre a loja. */
+function fecharHora() {
+  const ganho = hourBonus(run.hour);
+  eco.gears += ganho;
+  // A onda fecha com a hora. O SPEC §11 conta com isso: o snapshot é tirado
+  // na loja justamente por não haver inimigo em voo para serializar.
+  enemies.clear();
+  popover.fechar();
+  run.phase = 'shop';
+  openShop(shop, run, pieces);
+  shopUi.abrir(run, shop, eco, ganho);
+}
+
+/** Único jeito de sair da loja. Nunca avança sozinho. */
+function seguir() {
+  shopUi.fechar();
+  if (isLastHour(run)) {
+    run.won = true;
+    terminar();
+    return;
+  }
+  nextHour(run);
+  run.phase = 'run';
+}
+
+function terminar() {
+  run.phase = 'gameover';
+  screens.fim(run, eco);
+}
+
+function comprar(card) {
+  if (shop.bought.has(card.id)) return;
+  const custo = cardCost(card);
+  if (!pay(eco, custo)) return;
+  shop.bought.add(card.id);
+
+  switch (card.kind) {
+    // A loja é o portão dos tipos de peça: comprar libera o tipo para o
+    // resto da partida, e o painel passa a aceitá-lo. Ver SPEC §9 e §10.
+    case 'piece': run.unlocked.add(card.type); break;
+    case 'upgrade': upgrade(card.piece); break;
+    case 'wind': gainWindMax(eco, B.shop.windGain); break;
+    case 'speed':
+      run.speedCards++;
+      // Escala segundos e minutos juntos: a razão 5:1 é o que mantém a
+      // Meia-Noite caindo em cima de slot (SPEC §5, §9).
+      run.speedBonus += B.shop.speedStep;
+      break;
+  }
+}
+
+function trocarCartas() {
+  if (!pay(eco, rerollCost(shop))) return;
+  shop.rerolls++;
+  roll(shop, run, pieces);
+}
+
+// HUD e painel só existem durante a onda: na loja e nas telas eles poluiriam
+// o cabeçalho por baixo do overlay.
+const elTopbar = document.getElementById('topbar');
+const elPanel = document.getElementById('panel');
+let hudVisivel = null;
+function mostrarHud(sim) {
+  if (sim === hudVisivel) return;
+  hudVisivel = sim;
+  elTopbar.hidden = !sim;
+  elPanel.hidden = !sim;
+}
+
+const shopUi = createShopUi({ onBuy: comprar, onReroll: trocarCartas, onContinue: seguir });
+const screens = createScreens({ onStart: comecar, onRestart: comecar });
 
 // Toque numa peça colocada abre o popover. Um toque é pointerdown e pointerup
 // perto um do outro; qualquer arrasto maior é outra coisa.
@@ -245,13 +341,12 @@ function render() {
 
 const loop = createLoop({ update, render });
 
-hud.onRestart(restart);
-
 // Atalhos que o M2 deixou pendentes, agora que existe sistema para eles agir.
 debug.addShortcut('e', 'spawna Poeira', () => spawnGroup(spawner, enemies));
 debug.addShortcut('g', '+100 engrenagens', () => { eco.gears += 100; });
 debug.addShortcut('i', 'invencibilidade', () => { eco.invincible = !eco.invincible; });
-debug.addShortcut('r', 'reinicia', restart);
+debug.addShortcut('r', 'reinicia', comecar);
+debug.addShortcut('h', 'pula hora', () => { if (run.phase === 'run') fecharHora(); });
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) loop.stop();
@@ -259,6 +354,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 resize();
+screens.mostrarMenu(true);
 sampleStart = performance.now();
 loop.start();
 
@@ -266,7 +362,8 @@ if (__DEV__) {
   window.BALANCE = BALANCE;
   window.__RELOGIO__ = {
     VIEW, canvas, ctx, loop, clock, renderer, pieces, debug,
-    enemies, eco, spawner, restart, panel, popover, canPlaceAt,
+    enemies, eco, spawner, panel, popover, canPlaceAt, run, shop,
+    comecar, fecharHora, seguir, comprar, trocarCartas, rngMod,
     // Coloca sem pagar nem checar. Só para teste e depuração.
     place: (type, ring, slot) => {
       const p = createPiece(type, ring, slot);

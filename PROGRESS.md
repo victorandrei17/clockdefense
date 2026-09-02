@@ -147,7 +147,7 @@ Referência: SPEC §5.
 - [x] Um Martelo hardcoded no slot interno 0, com feedback visual claro no disparo
 - [x] Detecção de Meia-Noite (segundos e minutos a <3°) com clarão âmbar
 - [x] **Overlay de debug** (`F1` no desktop, 3 dedos no celular): ângulos dos ponteiros, hitboxes, alcance das peças, dt, fps, contagem de objetos vivos
-- [~] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
+- [x] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
 
 **Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada 7,5 s avançando 90°, fechando o ciclo nas colunas 0°, 90°, 180° e 270° a cada 30 s.
 
@@ -189,8 +189,8 @@ Arquivos novos: `src/data/pieces.data.js`, `src/game/pieces.js`, `src/render/fx.
   e invencibilidade (M3) entram com os marcos que criam essas coisas —
   `debug.addShortcut()` já está pronto para recebê-los.
   **Atualização (M3):** `E` (spawna Poeira), `G` (+100 engrenagens),
-  `I` (invencibilidade) e `R` (reinicia) já entraram. Falta só "pular hora",
-  que depende da estrutura de partida do M5.
+  `I` (invencibilidade) e `R` (reinicia) já entraram.
+  **Atualização (M5):** `H` (pula hora) fechou a lista.
 
 **Verificação.** Chromium headless, com o relógio zerado para o tempo medido
 bater com o tempo de jogo:
@@ -434,21 +434,92 @@ em 40 em vez de inflar até o teste passar.
 **Objetivo:** uma partida completa, do início ao fim.
 Referência: SPEC §9.
 
-- [ ] `rng.js` mulberry32 com semente e contador de chamadas
-- [ ] 6 horas de 60 s, transição, ponteiro das horas como progresso
-- [ ] Dreno da corda escalando +0,1/s por hora
-- [ ] Loja pausada na virada: 4 cartas, reroll 5+3, pool condicional
-- [ ] Carta de velocidade escala segundos **e** minutos juntos, preservando a razão 5:1
-- [ ] Upgrade só aparece se a peça estiver no mostrador
-- [ ] Bônus de fim de hora `10 + 3×hora`
-- [ ] Botão "Dar corda" — nunca avança sozinho
-- [ ] Telas MENU e GAMEOVER básicas
+- [x] `rng.js` mulberry32 com semente e contador de chamadas
+- [x] 6 horas de 60 s, transição, ponteiro das horas como progresso
+- [x] Dreno da corda escalando +0,1/s por hora
+- [x] Loja pausada na virada: 4 cartas, reroll 5+3, pool condicional
+- [x] Carta de velocidade escala segundos **e** minutos juntos, preservando a razão 5:1
+- [x] Upgrade só aparece se a peça estiver no mostrador
+- [x] Bônus de fim de hora `10 + 3×hora`
+- [x] Botão "Dar corda" — nunca avança sozinho
+- [x] Telas MENU e GAMEOVER básicas
 
 **Pronto quando:** você joga 6 horas seguidas sem o chefe, com loja em cada virada.
 
 > **Pare aqui e jogue umas 10 partidas antes do M6.** Se não for divertido agora, o problema é o design do núcleo, não a falta de conteúdo. Ajuste `balance.js` — principalmente dreno da corda, custo das peças e os 8 segundos da Meia-Noite — até o loop prender. Adicionar inimigo nenhum vai consertar um núcleo chato.
 
+**Notas:**
+
+Arquivos novos: `src/util/rng.js`, `src/game/run.js`, `src/game/shop.js`,
+`src/render/ui/shop.js`, `src/render/ui/screens.js`.
+
+- **A loja é o portão dos tipos de peça.** O §9 põe "peças disponíveis" no
+  pool da loja, mas o §6 já vende peças no painel — pareciam dois caminhos
+  redundantes. O que resolve é o §10: o desbloqueio do Contrapeso por 25 rubis
+  "adiciona a peça ao **pool da loja**", o que só significa algo se a loja for
+  o portão. Então: a carta de peça **libera o tipo** para o resto da partida, e
+  o painel continua cobrando engrenagens para colocar. As três seções ficam
+  verdadeiras ao mesmo tempo e nada do M4 precisou mudar. A partida começa só
+  com o Martelo liberado.
+- **`phase` também carrega as telas.** `menu | run | shop | gameover` num
+  campo só, em `run.js`. Um `core/state.js` separado seria indireção sem
+  conteúdo; se o M8 trouxer META e transições de verdade, ele se justifica.
+- **Só a fase `run` faz o mundo andar.** Na loja o relógio para de verdade —
+  nada de loja em tempo real, que no celular é hostil.
+- **A onda fecha com a hora.** Ao virar, os inimigos em voo somem. Não é
+  atalho: o SPEC §11 conta com isso ao dizer que o snapshot sai na loja
+  justamente por não haver inimigo para serializar.
+- **A carta de velocidade escala o mecanismo inteiro**, segundos e minutos
+  juntos, preservando a razão 5:1 que mantém a Meia-Noite em cima de slot. O
+  ponteiro das horas nunca escala: ele mede a partida.
+- **`+10 corda` sobe o máximo junto**, senão o ganho evaporaria no primeiro
+  dreno.
+- **HUD e painel somem fora da onda**, senão vazam por baixo do overlay da
+  loja.
+
+**A economia fecha agora**
+
+O M4 mediu que o laço não girava: subir o capital inicial de 40 para 130 não
+mudava o número de peças compradas depois do t=0, que ficava em 1. Com o bônus
+de fim de hora, 200 partidas de um bot que só compra Martelos:
+
+| | M4 (sem bônus) | M5 (com bônus) |
+|---|---|---|
+| peças no fim | 3–4 | **8** |
+| passa da hora 1 | não | **sim** |
+
+**Mas ninguém sobrevive as 6 horas: 0 de 200.** A mediana morre na hora 2, com
+a corda em 12 ao fim da hora 1. O bot é burro — só compra Martelo, nunca sobe
+nível nem usa Sino — mas a margem está claramente apertada demais.
+
+É exatamente o que o portão acima manda resolver, e resolver **jogando**. Os
+números mais suspeitos, em ordem:
+
+1. `spawn.interval` (15 s) e `spawn.groupMin/Max` (6–10): a hora 1 joga ~32
+   Poeiras, e cada uma tira 4 de corda se passar.
+2. `wind.drain` (0,4/s) escalando +0,1 por hora: nas horas 5 e 6 são 0,8 e 0,9.
+3. `gears.start` (40) e os custos das peças.
+
+Não mexi em nenhum deles às cegas. São seus, e o marco existe para você
+decidir com o jogo na mão.
+
+**Verificação.** 33 asserções no navegador:
+
+- MENU abre primeiro, HUD escondido; "Dar corda" começa na hora 1.
+- Só o Martelo começa liberado; peça travada fica apagada e sem preço.
+- A virada abre a loja com 4 cartas, paga 13 de bônus (10+3×1), limpa os
+  inimigos e **para o relógio** — conferido que o ponteiro não anda.
+- Reroll custa 5 e depois 8 (5+3).
+- Comprar carta de peça libera o tipo e a carta desabilita.
+- A carta de mecanismo dá +10% e a razão 5:1 sobrevive (conferida = 5).
+- Seis horas seguidas com loja em cada virada; na última o botão vira
+  "Encerrar" e a partida termina em "Seis horas".
+- `mulberry32` com `replay()` reproduz a sequência a partir da semente.
+
 **Notas de balanceamento:**
+
+_A preencher depois de jogar._ Ponto de partida medido: 0/200 partidas
+sobrevivem as 6 horas com um bot que só compra Martelos.
 
 ---
 
@@ -552,6 +623,9 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
 | 2026-09-02 | M3 | Critério do M3 reescrito de "com o Martelo" para "com três Martelos", e o demo passou a ter 3 | Uma peça de alcance 70 cobre 15,5% das direções no aro interno e perde metade do que entra, então mata ~8% do fluxo: +2% de sobrevivência, invisível jogando. O teto é geométrico e independe do volume de inimigos, dreno ou custo — nenhum ajuste de balanceamento o move. Três dão +30%. Alternativa descartada: subir o alcance para ~110, que deixaria o Martelo dominante e criaria justamente o "compre mais martelos" que o SPEC §6 quer evitar. |
+| 2026-09-02 | M5 | A loja libera **tipos** de peça; o painel continua cobrando para colocar | O §9 põe "peças disponíveis" no pool da loja e o §6 já vende peças no painel. O §10 desempata: o desbloqueio do Contrapeso "adiciona a peça ao pool da loja", o que só faz sentido se a loja for o portão dos tipos. Assim as três seções ficam verdadeiras e o M4 não precisou mudar. |
+| 2026-09-02 | M5 | Telas moram em `run.phase`, sem `core/state.js` | `menu \| run \| shop \| gameover` num campo só. Um módulo separado seria indireção sem conteúdo; se o M8 trouxer META e transições de verdade, ele se justifica. |
+| 2026-09-02 | M5 | A onda fecha com a hora: inimigos em voo somem na virada | O SPEC §11 já conta com isso ao dizer que o snapshot sai na loja por não haver inimigo para serializar. |
 | 2026-09-02 | M4 | Contrapeso só gasta carga quando acerta alguém | Descarregando no vazio, o ponteiro dos segundos cruza toda peça a cada 6 s e as cargas travam em 6 — o teto de 8 do SPEC seria inalcançável e a peça perderia o propósito de premiar slot pouco visitado por inimigo. SPEC §6 atualizado. |
 | 2026-09-02 | M4 | Multiplicador de ponteiro aplica-se só a dano | O SPEC não diz o que o ×5 dos minutos faz com Mola e Ampulheta, que não causam dano. Aplicar a empurrão e lentidão inflaria peças de controle sem motivo; ignorar dá textura: peça de dano quer o aro interno, peça de controle é indiferente. |
 | 2026-09-02 | M4 | `gears.start = 40` criado, fora do SPEC | Sem engrenagem inicial não dá para colocar a primeira peça, e sem peça não se ganha engrenagem. Medido que subir esse número não fecha o laço econômico (sempre 1 compra depois do t=0, de 40 a 130), então ficou no menor valor que permite começar. |

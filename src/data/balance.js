@@ -37,6 +37,18 @@ export const BALANCE = {
   // primeira peça, e sem peça não se mata nada para ganhar engrenagens.
   gears: { start: 40, dust: 2 },
 
+  // SPEC §9.
+  shop: {
+    cards: 4,
+    rerollBase: 5,
+    rerollStep: 3,
+    windCost: 15,
+    windGain: 10,
+    speedCost: 35,
+    speedMax: 3,
+    speedStep: 0.1,
+  },
+
   // SPEC §6. Cargas do Contrapeso e devolução da venda.
   pieces: { chargePerSecond: 1, sellRatio: 0.5 },
 

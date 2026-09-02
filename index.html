@@ -126,7 +126,8 @@
     color: var(--osso);
   }
 
-  #gameover {
+  /* Telas cheias: loja, menu e fim de jogo dividem a mesma base. */
+  #shop, #menu, #gameover {
     position: absolute;
     inset: 0;
     display: flex;
@@ -134,9 +135,77 @@
     align-items: center;
     justify-content: center;
     gap: calc(14px * var(--ui));
-    background: rgba(20, 17, 14, 0.88);
+    background: rgba(20, 17, 14, 0.94);
     pointer-events: auto;
     text-align: center;
+  }
+
+  #shop { justify-content: space-between; padding: calc(60px * var(--ui)) calc(26px * var(--ui)); }
+  .tela-topo, .tela-baixo { display: flex; flex-direction: column; align-items: center; gap: calc(10px * var(--ui)); width: 100%; }
+
+  #shop h2, .titulo {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 500;
+    color: var(--osso);
+  }
+  #shop h2 { font-size: calc(32px * var(--ui)); }
+  .titulo { font-size: calc(50px * var(--ui)); }
+
+  #shop-bonus, #menu-sub { margin: 0; font-size: calc(17px * var(--ui)); color: var(--latao); }
+
+  #shop-cartas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(12px * var(--ui));
+    width: 100%;
+  }
+
+  .oferta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(6px * var(--ui));
+    padding: calc(16px * var(--ui)) calc(10px * var(--ui));
+    min-height: calc(112px * var(--ui));
+    font: inherit;
+    color: var(--osso);
+    background: rgba(35, 29, 22, 0.95);
+    border: 1px solid rgba(176, 138, 74, 0.5);
+    border-radius: calc(5px * var(--ui));
+    cursor: pointer;
+  }
+  .oferta .ot { font-size: calc(19px * var(--ui)); }
+  .oferta .od { font-size: calc(13px * var(--ui)); color: var(--latao); }
+  .oferta .oc { font-size: calc(17px * var(--ui)); color: var(--ambar); font-variant-numeric: tabular-nums; }
+  .oferta[disabled] { opacity: 0.35; cursor: default; }
+  .oferta.comprada { opacity: 0.4; border-color: var(--patina); }
+
+  #shop-reroll {
+    padding: calc(12px * var(--ui)) calc(22px * var(--ui));
+    min-height: calc(46px * var(--ui));
+    font: inherit;
+    font-size: calc(15px * var(--ui));
+    color: var(--osso);
+    background: transparent;
+    border: 1px solid rgba(176, 138, 74, 0.5);
+    border-radius: calc(4px * var(--ui));
+    cursor: pointer;
+  }
+  #shop-reroll[disabled] { opacity: 0.35; cursor: default; }
+
+  .grande {
+    padding: calc(17px * var(--ui)) calc(46px * var(--ui));
+    min-height: calc(52px * var(--ui));
+    font: inherit;
+    font-size: calc(22px * var(--ui));
+    letter-spacing: calc(1px * var(--ui));
+    color: var(--breu);
+    background: var(--latao);
+    border: 0;
+    border-radius: calc(4px * var(--ui));
+    cursor: pointer;
   }
 
   #gameover h1 {
@@ -223,6 +292,8 @@
 
   /* Sem saldo: a carta apaga e para de aceitar arrasto. */
   .carta[disabled] { opacity: 0.35; cursor: default; }
+  /* Tipo ainda não liberado pela loja: some o preço e apaga mais. */
+  .carta.travada { opacity: 0.22; border-style: dashed; }
   .carta.arrastando { border-color: var(--ambar); }
 
   /* --- Popover de peça colocada --- */
@@ -351,6 +422,25 @@
           <button id="pop-melhorar" type="button"></button>
           <button id="pop-vender" type="button"></button>
         </div>
+      </div>
+
+      <!-- Loja da virada de hora, e as telas de menu e fim. -->
+      <div id="shop" hidden>
+        <div class="tela-topo">
+          <h2 id="shop-hora"></h2>
+          <p id="shop-bonus"></p>
+        </div>
+        <div id="shop-cartas"></div>
+        <div class="tela-baixo">
+          <button id="shop-reroll" type="button"></button>
+          <button id="shop-seguir" class="grande" type="button">Dar corda</button>
+        </div>
+      </div>
+
+      <div id="menu" hidden>
+        <h1 class="titulo">O Último Relógio</h1>
+        <p id="menu-sub">Seis horas. Meia-noite é o fim.</p>
+        <button id="menu-jogar" class="grande" type="button">Dar corda</button>
       </div>
 
       <div id="gameover" hidden>

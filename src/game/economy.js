@@ -9,26 +9,26 @@ export function createEconomy() {
     gears: B.gears.start,
     kills: 0,
     elapsed: 0,
-    hour: 1,
     alive: true,
     invincible: false, // atalho de debug
   };
 }
 
-/** Dreno por segundo na hora atual: 0,4 na primeira, 0,9 na sexta. */
-export function drainRate(eco) {
-  return B.wind.drain + B.wind.drainPerHour * (eco.hour - 1);
+/** Dreno por segundo na hora dada: 0,4 na primeira, 0,9 na sexta. */
+export function drainRate(hour) {
+  return B.wind.drain + B.wind.drainPerHour * (hour - 1);
 }
 
-export function tick(eco, dt) {
+export function tick(eco, dt, hour) {
   if (!eco.alive) return;
-
   eco.elapsed += dt;
-  // A hora sai do tempo decorrido. A estrutura de partida com transição e
-  // loja na virada é do M5; aqui só precisamos da hora para escalar o dreno.
-  eco.hour = Math.min(B.run.hours, Math.floor(eco.elapsed / B.run.hourSeconds) + 1);
+  if (!eco.invincible) spend(eco, drainRate(hour) * dt);
+}
 
-  if (!eco.invincible) spend(eco, drainRate(eco) * dt);
+/** Corda máxima sobe junto, senão o +10 evapora no primeiro dreno. */
+export function gainWindMax(eco, amount) {
+  eco.windMax += amount;
+  eco.wind = Math.min(eco.windMax, eco.wind + amount);
 }
 
 /** Tira da corda. O dreno e o dano de inimigo passam por aqui. */
