@@ -332,16 +332,100 @@ de verdade.
 **Objetivo:** o jogador constrói o mostrador.
 Referência: SPEC §6.
 
-- [ ] Painel de peças na base, arrasto até o slot, slots válidos acendendo
-- [ ] Popover ao tocar peça colocada: Melhorar / Vender (50%)
-- [ ] Martelo, Sino, Mola, Ampulheta, Corrente, Contrapeso — os 3 níveis de cada
-- [ ] Corrente só funciona em coluna com par interno+externo; recusa visualmente a colocação inútil
-- [ ] Contrapeso acumulando e gastando cargas, com indicador visível
-- [ ] Multiplicadores aplicados: minutos ×5, Meia-Noite ×3
+- [x] Painel de peças na base, arrasto até o slot, slots válidos acendendo
+- [x] Popover ao tocar peça colocada: Melhorar / Vender (50%)
+- [x] Martelo, Sino, Mola, Ampulheta, Corrente, Contrapeso — os 3 níveis de cada
+- [x] Corrente só funciona em coluna com par interno+externo; recusa visualmente a colocação inútil
+- [x] Contrapeso acumulando e gastando cargas, com indicador visível
+- [x] Multiplicadores aplicados: minutos ×5, Meia-Noite ×3
 
 **Pronto quando:** dá pra montar um mostrador do zero só com engrenagens ganhas em jogo, e cada peça se comporta de forma perceptivelmente diferente das outras.
 
+> A segunda metade passa. A primeira passa pela metade: dá para montar um
+> mostrador de 4 peças sem trapaça, mas o **reinvestimento** dentro de uma hora
+> quase não acontece, porque falta a outra metade da renda — o bônus de fim de
+> hora, que é do M5. Ver "A economia ainda não fecha", abaixo.
+
 **Notas:**
+
+Arquivos novos: `src/core/input.js`, `src/render/ui/panel.js`,
+`src/render/ui/popover.js`. `pieces.data.js` ganhou as 6 peças com 3 níveis,
+`pieces.js` foi reescrito, `enemies.js` ganhou lentidão, empurrão e consultas
+por área.
+
+- **Efeitos moram em `pieces.js`.** Um mapa `EFFECTS[tipo]` recebe a peça, as
+  estatísticas do nível e um objeto `world` com o que ela pode fazer (acertar,
+  clarão). Assim `pieces.js` não conhece economia nem partículas, e o `main.js`
+  não vira um `switch` gigante.
+- **O multiplicador do ponteiro vale só para dano.** Mola e Ampulheta não
+  ganham nada de receber o ponteiro dos minutos, porque não causam dano nenhum.
+  Isso dá uma textura boa sem código extra: peça de dano quer o aro interno,
+  peça de controle é indiferente ao ponteiro que a cruza.
+- **O Contrapeso só gasta carga quando acerta.** Achado pelo teste: com a
+  versão anterior, que descarregava no vazio, o ponteiro dos segundos cruza
+  toda peça a cada 6 s e as cargas travavam em 6 — o teto de 8 do SPEC era
+  inalcançável e a peça perdia o propósito. O slot "ruim" que ela premia é o
+  por onde passa pouco **inimigo**, não o por onde passa pouco ponteiro.
+  SPEC §6 atualizado.
+- **Silhueta antes de cor.** Cada peça tem um glifo desenhado em traço, não um
+  disco colorido: martelo em T, sino, mola em ziguezague, ampulheta, dois elos,
+  contrapeso. Tem de dar para reconhecer sem legenda e com a peça apagada.
+- **Indicadores sem texto no canvas.** Carga do Contrapeso é um anel que
+  preenche; nível é um traço por nível acima do primeiro; a Corrente desenha o
+  segmento que liga, e no nível 3 as colunas vizinhas junto.
+- **Arrasto é DOM + canvas.** A carta é DOM (é UI), mas os slots que acendem e
+  o fantasma da peça são canvas, porque acontecem sobre o mostrador. O painel
+  só toca o DOM quando o saldo muda.
+- **Slots válidos acendem, inválidos nem aparecem.** É essa a "recusa visual"
+  da Corrente: numa coluna órfã o slot simplesmente não acende, e soltar ali
+  não faz nada nem cobra.
+- **`gears.start = 40` é invenção minha**, não do SPEC. Sem engrenagem inicial
+  não dá para colocar a primeira peça, e sem peça não se mata nada para ganhar
+  engrenagem.
+- **Os 3 Martelos fixos do M3 saíram.** O mostrador começa vazio, que é o
+  ponto do marco.
+- Sino nível 3 ("surdez, remove buffs") está implementado como flag, mas **não
+  faz nada no MVP**: nenhum inimigo do SPEC §7 tem buff para remover. Mola
+  nível 3 ("escolha na compra: fora ou dentro") existe como `pushDir` e fica
+  em "fora" até a loja do M5 oferecer a escolha.
+- Dano e custo de melhoria das peças são provisórios: o SPEC fixa custo base,
+  alcance e o que cada nível muda, mas não o dano.
+
+**A economia ainda não fecha**
+
+Simulando um jogador que compra só com o que ganha, 80 partidas:
+
+| engrenagens iniciais | peças no fim | compradas depois do t=0 |
+|---|---|---|
+| 40 | 4 | 1 |
+| 60 | 5 | 1 |
+| 80 | 6 | 1 |
+| 100 | 6 | 1 |
+| 130 | 8 | 1 |
+
+Subir o capital inicial **não gira o laço** — só engorda o mostrador de
+partida. Matar rende ~16 engrenagens numa hora, e a peça mais barata custa 10.
+A metade que falta é o bônus de fim de hora do SPEC §8 (`10 + 3×hora`), que
+soma **123** numa partida de 6 horas — comparável a tudo que se ganha matando.
+Ele entra no M5 junto com a estrutura de partida, e é lá que o portão de
+diversão manda ajustar esses números jogando. Por isso mantive `gears.start`
+em 40 em vez de inflar até o teste passar.
+
+**Verificação.** Node para a lógica, navegador para a interface:
+
+- Cada peça faz algo diferente com 6 inimigos parados em cima: Martelo 10 de
+  dano em 1 alvo, Sino 48 em área, Mola 0 de dano e 6 empurrados, Ampulheta
+  0 de dano e 6 lentos, Corrente 48 no segmento, Contrapeso 24 por carga.
+- Níveis mudam o comportamento: Martelo 3 acerta 2 alvos (10 → 36 de dano),
+  Sino 2 alcança a 105 px que o nível 1 não alcança, Corrente 2 dobra o dano,
+  Ampulheta 3 deixa zona de pé, Contrapeso 2 sobe o teto de 8 para 12.
+- Corrente aceita os 6 slots internos e os 6 externos pares, recusa os 6
+  órfãos; nenhuma peça entra em slot ocupado.
+- Arrasto coloca e debita; slot ocupado e coluna órfã recusam sem cobrar.
+- Popover: melhora 1→2→3 debitando 15 e 25, desabilita no topo, e vende
+  devolvendo 25 (50% de 10+15+25) tirando a peça.
+- Carta apaga sem saldo e acende no limite exato.
+- Mostrador montado do zero, sem trapaça, chega a 4 peças.
 
 ---
 
@@ -468,6 +552,9 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
 | 2026-09-02 | M3 | Critério do M3 reescrito de "com o Martelo" para "com três Martelos", e o demo passou a ter 3 | Uma peça de alcance 70 cobre 15,5% das direções no aro interno e perde metade do que entra, então mata ~8% do fluxo: +2% de sobrevivência, invisível jogando. O teto é geométrico e independe do volume de inimigos, dreno ou custo — nenhum ajuste de balanceamento o move. Três dão +30%. Alternativa descartada: subir o alcance para ~110, que deixaria o Martelo dominante e criaria justamente o "compre mais martelos" que o SPEC §6 quer evitar. |
+| 2026-09-02 | M4 | Contrapeso só gasta carga quando acerta alguém | Descarregando no vazio, o ponteiro dos segundos cruza toda peça a cada 6 s e as cargas travam em 6 — o teto de 8 do SPEC seria inalcançável e a peça perderia o propósito de premiar slot pouco visitado por inimigo. SPEC §6 atualizado. |
+| 2026-09-02 | M4 | Multiplicador de ponteiro aplica-se só a dano | O SPEC não diz o que o ×5 dos minutos faz com Mola e Ampulheta, que não causam dano. Aplicar a empurrão e lentidão inflaria peças de controle sem motivo; ignorar dá textura: peça de dano quer o aro interno, peça de controle é indiferente. |
+| 2026-09-02 | M4 | `gears.start = 40` criado, fora do SPEC | Sem engrenagem inicial não dá para colocar a primeira peça, e sem peça não se ganha engrenagem. Medido que subir esse número não fecha o laço econômico (sempre 1 compra depois do t=0, de 40 a 130), então ficou no menor valor que permite começar. |
 | 2026-09-02 | M3 | Grupos de Poeira nascem espalhados pela volta inteira e pingados, não num arco fechado nem todos de uma vez | Em arco estreito a utilidade de cada peça vira loteria: medindo, em ~5 de 6 partidas nenhum inimigo passava perto do slot com Martelo. Nascendo todos no mesmo raio, chegam juntos e a morte fica quantizada pela chegada dos grupos, o que zera o efeito de matar dois ou três. |
 | 2026-09-02 | M3 | Tela de fim de jogo provisória com botão "Dar corda" | O critério do M3 exige comparar duas partidas; sem reinício isso vira recarregar a página a cada teste. A GAMEOVER de verdade é do M5. |
 | 2026-09-02 | M2 | `crossed()` usa intervalo aberto em `prev` e fechado em `curr`, e devolve false com `d = 0` | O snippet do SPEC (`t <= d`) dispara duas vezes quando o ponteiro termina o frame em cima do alvo, e dispara todo frame com o ponteiro pausado. SPEC §5 corrigido no mesmo commit. |

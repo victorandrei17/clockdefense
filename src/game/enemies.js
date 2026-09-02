@@ -1,7 +1,7 @@
 // Inimigos. SPEC §7.
 import { BALANCE as B } from '../data/balance.js';
 import { ENEMIES } from '../data/enemies.data.js';
-import { DEG, norm } from '../util/math.js';
+import { DEG, norm, angleDiff } from '../util/math.js';
 import { createPool } from '../util/pool.js';
 
 // Com um grupo de até 10 a cada 20 s e ~12 s de trajeto, raramente passa de
@@ -20,7 +20,9 @@ export function createEnemies() {
     speed: 0,
     damage: 0,
     drawRadius: 0,
-    hit: 0, // 1 no instante do dano, decai — só feedback visual
+    hit: 0,        // 1 no instante do dano, decai — só feedback visual
+    slowFactor: 0, // 0 a 1, quanto a Ampulheta tira da velocidade
+    slowTime: 0,
   }));
 }
 
@@ -36,6 +38,8 @@ export function spawn(pool, type, angle) {
   e.damage = d.damage;
   e.drawRadius = d.radius;
   e.hit = 0;
+  e.slowFactor = 0;
+  e.slowTime = 0;
   place(e);
   return e;
 }
@@ -59,7 +63,12 @@ export function updateEnemies(pool, dt, onReach) {
 
     if (e.hit > 0) e.hit = Math.max(0, e.hit - dt / 0.12);
 
-    e.radius -= e.speed * dt;
+    if (e.slowTime > 0) {
+      e.slowTime -= dt;
+      if (e.slowTime <= 0) e.slowFactor = 0;
+    }
+
+    e.radius -= e.speed * (1 - e.slowFactor) * dt;
     if (e.radius <= B.board.hub) {
       e.radius = B.board.hub;
       place(e);
@@ -80,14 +89,14 @@ export function damage(pool, e, amount) {
   return true;
 }
 
-/** Inimigo vivo mais próximo de (x, y) dentro de `range`. Null se não houver. */
-export function nearest(pool, x, y, range) {
+/** Inimigo vivo mais próximo de (x, y) dentro de `range`, ignorando `exclude`. */
+export function nearest(pool, x, y, range, exclude) {
   const items = pool.items;
   let best = null;
   let bestD2 = range * range;
   for (let i = 0; i < items.length; i++) {
     const e = items[i];
-    if (!e.active) continue;
+    if (!e.active || e === exclude) continue;
     const dx = e.x - x;
     const dy = e.y - y;
     const d2 = dx * dx + dy * dy;
@@ -97,4 +106,55 @@ export function nearest(pool, x, y, range) {
     }
   }
   return best;
+}
+
+/** Ampulheta: lentidão. A mais forte vence; nunca encurta uma já aplicada. */
+export function slow(e, factor, duration) {
+  if (factor >= e.slowFactor) e.slowFactor = factor;
+  e.slowTime = Math.max(e.slowTime, duration);
+}
+
+/** Mola: empurra ao longo do raio. Positivo é para fora. */
+export function push(pool, e, distance) {
+  e.radius += distance;
+  if (e.radius > B.board.spawn) e.radius = B.board.spawn;
+  if (e.radius <= B.board.hub) {
+    // Empurrado para dentro do cubo: some sem causar dano, é o efeito
+    // pretendido do nível 3 da Mola virado para dentro.
+    pool.release(e);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Inimigos dentro de um círculo. Chama `fn(e)` em cada um — sem alocar array,
+ * porque isto roda a cada disparo de Sino.
+ */
+export function eachInCircle(pool, x, y, radius, fn) {
+  const items = pool.items;
+  const r2 = radius * radius;
+  for (let i = 0; i < items.length; i++) {
+    const e = items[i];
+    if (!e.active) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    if (dx * dx + dy * dy <= r2) fn(e);
+  }
+}
+
+/**
+ * Inimigos no segmento radial de uma coluna: raio entre `r0` e `r1`, e a
+ * menos de `width` da linha do ângulo. É o alcance da Corrente.
+ */
+export function eachInColumn(pool, angle, r0, r1, width, fn) {
+  const items = pool.items;
+  for (let i = 0; i < items.length; i++) {
+    const e = items[i];
+    if (!e.active) continue;
+    if (e.radius < r0 || e.radius > r1) continue;
+    // Distância perpendicular à linha radial.
+    const off = Math.abs(e.radius * Math.sin(angleDiff(angle, e.angle) * DEG));
+    if (off <= width) fn(e);
+  }
 }

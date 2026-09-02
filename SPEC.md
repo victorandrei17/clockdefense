@@ -153,7 +153,7 @@ Ponteiro extra controlado por arrasto em qualquer lugar do mostrador. Segue o â
 | **Mola** | 15 | Empurra 80 px para fora. Sem dano | 80 | empurrão 140 px | escolha na compra: fora ou dentro |
 | **Ampulheta** | 20 | Lentidão −40% por 2,5 s | 100 | −60% | zona persiste 4 s |
 | **Corrente** | 40 | Liga externo↔interno da coluna, dana tudo no segmento | coluna | dano ×2 | acerta colunas vizinhas |
-| **Contrapeso** | 30 | +1 carga/s sem disparar (máx 8). Dano = base × cargas | 70 | máx 12 | em Meia-Noite não gasta cargas |
+| **Contrapeso** | 30 | +1 carga/s enquanto não acerta nada (máx 8). Dano = base × cargas | 70 | máx 12 | em Meia-Noite não gasta cargas |
 
 **Por que essas seis:**
 
@@ -161,6 +161,7 @@ Ponteiro extra controlado por arrasto em qualquer lugar do mostrador. Segue o â
 - Mola e Ampulheta **não dão dano**. Força a pensar em posicionamento. Sem elas o jogo vira "compre mais martelos".
 - Corrente **só existe se houver duas peças alinhadas**. Ensina o conceito de coluna sem tutorial escrito.
 - Contrapeso premia colocar algo num slot ruim, pouco visitado. Inverte a intuição.
+  As cargas só são gastas quando ele **acerta** alguém: o ponteiro dos segundos cruza toda peça a cada 6 s, então descarregar no vazio travaria a peça em 6 cargas e o teto de 8 nunca seria alcançado. O slot "ruim" que a peça premia é o por onde passa pouco inimigo, não o por onde passa pouco ponteiro.
 
 **Colocação:** arraste do painel inferior até um slot vago; slots válidos acendem durante o arrasto. Toque numa peça colocada abre popover com "Melhorar" e "Vender" (devolve 50%).
 

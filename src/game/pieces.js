@@ -1,8 +1,9 @@
-// Peças no mostrador e a detecção de disparo. SPEC §5, §6.
+// Peças no mostrador: colocação, disparo e efeitos. SPEC §5, §6.
 import { BALANCE as B } from '../data/balance.js';
 import { PIECES } from '../data/pieces.data.js';
-import { crossed } from '../util/math.js';
-import { innerSlots, outerSlots } from './board.js';
+import { crossed, norm } from '../util/math.js';
+import { slotsOf, isPairedSlot, COLUMN_STEP } from './board.js';
+import { damage, nearest, slow, push, eachInCircle, eachInColumn } from './enemies.js';
 
 /**
  * Ponteiros que disparam, em ordem decrescente de multiplicador.
@@ -10,15 +11,18 @@ import { innerSlots, outerSlots } from './board.js';
  * A ordem importa: o cooldown é por peça, e durante a Meia-Noite os dois
  * ponteiros cruzam o mesmo slot interno com poucos milissegundos de
  * diferença. Testando o de maior multiplicador primeiro, o cooldown nunca
- * engole o disparo grande em favor do pequeno.
+ * engole o disparo grande em favor do pequeno. Ver SPEC §5.
  */
 const FIRING_HANDS = [
-  { key: 'minute', angle: 'minute', prev: 'prevMinute', inner: true,  outer: false, mult: B.hands.minute.mult },
-  { key: 'second', angle: 'second', prev: 'prevSecond', inner: true,  outer: true,  mult: B.hands.second.mult },
+  { key: 'minute', angle: 'minute', prev: 'prevMinute', inner: true, outer: false, mult: B.hands.minute.mult },
+  { key: 'second', angle: 'second', prev: 'prevSecond', inner: true, outer: true,  mult: B.hands.second.mult },
 ];
 
-export function createPiece(type, ring, slotIndex) {
-  const slot = (ring === 'inner' ? innerSlots : outerSlots)[slotIndex];
+/** Largura da faixa da Corrente, em px de cada lado da linha da coluna. */
+const CHAIN_WIDTH = 16;
+
+export function createPiece(type, ring, slotIndex, level = 1) {
+  const slot = slotsOf(ring)[slotIndex];
   const data = PIECES[type];
   return {
     type,
@@ -27,24 +31,139 @@ export function createPiece(type, ring, slotIndex) {
     angle: slot.angle,
     x: slot.x,
     y: slot.y,
-    range: data.range,
-    damage: data.damage,
+    level,
+    // Total gasto na peça. A venda devolve metade disto.
+    invested: data.cost,
     cooldown: 0,
-    // 1 no instante do disparo, decai até 0. Só para o feedback visual.
     flash: 0,
     shots: 0,
     lastMult: 0,
     lastHand: '',
+    // Contrapeso.
+    charges: 0,
+    // Ampulheta nível 3: enquanto > 0, a zona de lentidão fica de pé.
+    zoneTime: 0,
+    // Mola nível 3: 1 empurra para fora, -1 para dentro.
+    pushDir: 1,
   };
 }
 
+export function stats(p) {
+  return PIECES[p.type].levels[p.level - 1];
+}
+
+export function maxLevel(p) {
+  return p.level >= PIECES[p.type].levels.length;
+}
+
+export function upgradeCost(p) {
+  return maxLevel(p) ? 0 : PIECES[p.type].upgrade[p.level - 1];
+}
+
+export function sellValue(p) {
+  return Math.floor(p.invested * B.pieces.sellRatio);
+}
+
+export function upgrade(p) {
+  if (maxLevel(p)) return false;
+  p.invested += upgradeCost(p);
+  p.level++;
+  return true;
+}
+
+export function pieceAt(pieces, ring, slotIndex) {
+  return pieces.find((p) => p.ring === ring && p.slot === slotIndex) ?? null;
+}
+
 /**
- * Testa cada peça contra cada ponteiro que alcança o aro dela.
- * `onFire(piece, mult, handKey)` é chamado no disparo.
+ * Dá para colocar `type` neste slot? Slot ocupado nunca serve; a Corrente
+ * ainda exige coluna com par interno+externo, senão não teria o que ligar.
  */
-export function updatePieces(pieces, clock, dt, onFire) {
+export function canPlace(type, ring, slotIndex, pieces) {
+  if (pieceAt(pieces, ring, slotIndex)) return false;
+  if (PIECES[type].columnOnly && !isPairedSlot(ring, slotIndex)) return false;
+  return true;
+}
+
+// --- efeitos ---------------------------------------------------------------
+//
+// `mult` vem do ponteiro (×5 nos minutos) e da Meia-Noite (×3). Multiplica
+// dano, e só dano: Mola e Ampulheta não ganham nada de passar um ponteiro
+// mais lento em cima, porque não causam dano nenhum.
+
+const EFFECTS = {
+  hammer(p, st, mult, w) {
+    let anterior = null;
+    for (let i = 0; i < st.targets; i++) {
+      const alvo = nearest(w.enemies, p.x, p.y, PIECES.hammer.range, anterior);
+      if (!alvo) return;
+      anterior = alvo;
+      w.hit(alvo, st.damage * mult);
+    }
+  },
+
+  bell(p, st, mult, w) {
+    eachInCircle(w.enemies, p.x, p.y, st.radius, (e) => w.hit(e, st.damage * mult));
+    w.flash(p.x, p.y, st.radius * 0.9);
+  },
+
+  spring(p, st, mult, w) {
+    eachInCircle(w.enemies, p.x, p.y, PIECES.spring.range, (e) => {
+      push(w.enemies, e, st.push * p.pushDir);
+    });
+  },
+
+  hourglass(p, st, mult, w) {
+    eachInCircle(w.enemies, p.x, p.y, PIECES.hourglass.range, (e) => {
+      slow(e, st.slow, st.duration);
+    });
+    if (st.zone) p.zoneTime = st.zone;
+  },
+
+  chain(p, st, mult, w) {
+    const r0 = B.board.inner;
+    const r1 = B.board.outer;
+    for (let d = -st.neighbours; d <= st.neighbours; d++) {
+      const ang = norm(p.angle + d * COLUMN_STEP);
+      eachInColumn(w.enemies, ang, r0, r1, CHAIN_WIDTH, (e) => w.hit(e, st.damage * mult));
+    }
+  },
+
+  counterweight(p, st, mult, w) {
+    const alvo = nearest(w.enemies, p.x, p.y, PIECES.counterweight.range);
+    // Sem alvo, guarda a carga. É o que faz a peça valer num slot por onde
+    // passa pouco inimigo: o ponteiro dos segundos cruza toda peça a cada
+    // 6 s, então gastar no vazio impediria de sair de 6 cargas — o teto de 8
+    // do SPEC seria inalcançável e a peça perderia o propósito.
+    if (!alvo) return;
+    w.hit(alvo, st.damage * p.charges * mult);
+    // Nível 3 guarda as cargas na Meia-Noite: é o pagamento por ter
+    // colocado a peça num slot ruim e esperado.
+    if (!(st.keepOnMidnight && w.midnight)) p.charges = 0;
+  },
+};
+
+/** Uma peça sem alvo nenhum ainda gasta o disparo. É assim de propósito. */
+export function updatePieces(pieces, clock, dt, world) {
+  const w = { ...world, midnight: clock.midnight };
+
   for (const p of pieces) {
+    const st = stats(p);
+
     if (p.flash > 0) p.flash = Math.max(0, p.flash - dt / 0.18);
+
+    // Contrapeso: acumula carga enquanto não dispara.
+    if (p.type === 'counterweight') {
+      p.charges = Math.min(st.maxCharges, p.charges + B.pieces.chargePerSecond * dt);
+    }
+
+    // Ampulheta nível 3: a zona segue segurando quem entrar.
+    if (p.zoneTime > 0) {
+      p.zoneTime -= dt;
+      eachInCircle(w.enemies, p.x, p.y, PIECES.hourglass.range, (e) => {
+        slow(e, st.slow, 0.2);
+      });
+    }
 
     if (p.cooldown > 0) {
       p.cooldown -= dt;
@@ -67,7 +186,10 @@ export function updatePieces(pieces, clock, dt, onFire) {
       p.shots++;
       p.lastMult = mult;
       p.lastHand = h.key;
-      onFire(p, mult, h.key);
+      // Clarão maior quando o multiplicador é maior: dá para ver de longe
+      // que aquele disparo valeu mais.
+      w.flash(p.x, p.y, 34 + 6 * Math.min(mult, 15));
+      EFFECTS[p.type](p, st, mult, w);
       break; // uma peça dispara uma vez por frame
     }
   }

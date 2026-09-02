@@ -6,7 +6,7 @@ export function createEconomy() {
   return {
     wind: B.wind.start,
     windMax: B.wind.start,
-    gears: 0,
+    gears: B.gears.start,
     kills: 0,
     elapsed: 0,
     hour: 1,
@@ -45,4 +45,15 @@ export function creditKill(eco, type) {
   eco.kills++;
   eco.gears += B.gears[type] ?? 0;
   eco.wind = Math.min(eco.windMax, eco.wind + B.wind.perKill);
+}
+
+/** Tenta gastar engrenagens. Devolve false se não houver saldo. */
+export function pay(eco, amount) {
+  if (eco.gears < amount) return false;
+  eco.gears -= amount;
+  return true;
+}
+
+export function refund(eco, amount) {
+  eco.gears += amount;
 }

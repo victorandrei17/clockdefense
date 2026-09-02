@@ -41,3 +41,33 @@ export const columns = outerSlots.map((o) => ({
   outer: o.index,
   inner: o.index % 2 === 0 ? o.index / 2 : null,
 }));
+
+/**
+ * O slot está numa coluna com par interno+externo? Todo slot interno está;
+ * dos externos, só os de índice par. A Corrente depende disso.
+ */
+export function isPairedSlot(ring, index) {
+  return ring === 'inner' || index % 2 === 0;
+}
+
+export function slotsOf(ring) {
+  return ring === 'inner' ? innerSlots : outerSlots;
+}
+
+/** Slot mais próximo de (x, y) dentro de `maxDist`. Null se não houver. */
+export function nearestSlot(x, y, maxDist) {
+  let best = null;
+  let bestD2 = maxDist * maxDist;
+  for (const list of [innerSlots, outerSlots]) {
+    for (const s of list) {
+      const dx = s.x - x;
+      const dy = s.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= bestD2) {
+        bestD2 = d2;
+        best = s;
+      }
+    }
+  }
+  return best;
+}

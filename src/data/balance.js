@@ -33,7 +33,12 @@ export const BALANCE = {
   run: { hours: 6, hourSeconds: 60 },
 
   // SPEC §8. Engrenagens por morte. Os outros inimigos entram no M6.
-  gears: { dust: 2 },
+  // `start` é provisório: sem engrenagens iniciais não dá para colocar a
+  // primeira peça, e sem peça não se mata nada para ganhar engrenagens.
+  gears: { start: 40, dust: 2 },
+
+  // SPEC §6. Cargas do Contrapeso e devolução da venda.
+  pieces: { chargePerSecond: 1, sellRatio: 0.5 },
 
   // Provisório do M3: um grupo a cada `interval` segundos. A composição de
   // verdade das 6 horas vem de `waves.data.js` no M6.

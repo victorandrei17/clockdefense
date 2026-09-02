@@ -13,6 +13,7 @@
     --osso:  #E4DCC8;
     --ambar: #E8A33D;
     --ferrugem: #8C3B2A;
+    --patina: #4E6B5C;
     /* Escala do palco (720x1280 lógico -> tela). Definida por main.js. */
     --ui: 1;
   }
@@ -168,6 +169,102 @@
 
   #restart:focus-visible { outline: calc(3px * var(--ui)) solid var(--ambar); outline-offset: calc(3px * var(--ui)); }
 
+  /* --- Painel de peças, na base: é onde o polegar alcança. --- */
+
+  #panel {
+    position: absolute;
+    left:   calc(16px * var(--ui));
+    right:  calc(16px * var(--ui));
+    bottom: calc(24px * var(--ui));
+    display: flex;
+    gap: calc(8px * var(--ui));
+    pointer-events: auto;
+  }
+
+  .carta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(4px * var(--ui));
+    padding: calc(10px * var(--ui)) calc(4px * var(--ui));
+    min-height: calc(96px * var(--ui));
+    font: inherit;
+    color: var(--osso);
+    background: rgba(30, 25, 19, 0.9);
+    border: 1px solid rgba(176, 138, 74, 0.45);
+    border-radius: calc(5px * var(--ui));
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .carta svg {
+    width:  calc(30px * var(--ui));
+    height: calc(30px * var(--ui));
+    stroke: var(--latao);
+    fill: none;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .carta .nome {
+    font-size: calc(12px * var(--ui));
+    letter-spacing: calc(0.5px * var(--ui));
+  }
+
+  .carta .custo {
+    font-size: calc(14px * var(--ui));
+    font-variant-numeric: tabular-nums;
+    color: var(--latao);
+  }
+
+  /* Sem saldo: a carta apaga e para de aceitar arrasto. */
+  .carta[disabled] { opacity: 0.35; cursor: default; }
+  .carta.arrastando { border-color: var(--ambar); }
+
+  /* --- Popover de peça colocada --- */
+
+  #popover {
+    position: absolute;
+    z-index: 2;
+    transform: translate(-50%, -100%);
+    display: flex;
+    flex-direction: column;
+    gap: calc(8px * var(--ui));
+    padding: calc(10px * var(--ui)) calc(12px * var(--ui));
+    background: rgba(24, 20, 15, 0.96);
+    border: 1px solid rgba(176, 138, 74, 0.5);
+    border-radius: calc(5px * var(--ui));
+    pointer-events: auto;
+    white-space: nowrap;
+  }
+
+  #pop-titulo {
+    font-size: calc(14px * var(--ui));
+    color: var(--osso);
+    text-align: center;
+  }
+
+  #popover .acoes { display: flex; gap: calc(8px * var(--ui)); }
+
+  #popover button {
+    padding: calc(11px * var(--ui)) calc(14px * var(--ui));
+    min-height: calc(44px * var(--ui));
+    font: inherit;
+    font-size: calc(14px * var(--ui));
+    color: var(--breu);
+    background: var(--latao);
+    border: 0;
+    border-radius: calc(4px * var(--ui));
+    cursor: pointer;
+  }
+
+  #popover button[disabled] { opacity: 0.4; cursor: default; }
+  #pop-vender { background: var(--patina); color: var(--osso); }
+
   /* Overlay de debug (F1, ou 3 dedos no celular). Ferramenta de trabalho,
      mantida até o fim do projeto — ver CLAUDE.md. */
   #debug {
@@ -186,10 +283,11 @@
     border-radius: calc(3px * var(--ui));
   }
 
+  /* Acima do painel de peças, não em cima dele. */
   #fps {
     position: absolute;
-    bottom: calc(10px * var(--ui));
-    right:  calc(14px * var(--ui));
+    bottom: calc(132px * var(--ui));
+    right:  calc(18px * var(--ui));
     font-size: calc(18px * var(--ui));
     font-variant-numeric: tabular-nums;
     letter-spacing: calc(1px * var(--ui));
@@ -211,6 +309,47 @@
         <div id="stats">
           <div><span class="label">HORA</span><span class="valor" id="hour">1/6</span></div>
           <div><span class="label">ENGRENAGENS</span><span class="valor" id="gears">0</span></div>
+        </div>
+      </div>
+
+      <div id="panel">
+        <button class="carta" type="button" data-type="hammer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h9v5H5z"/><path d="M9.5 13v7"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+        <button class="carta" type="button" data-type="bell">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17c0-6 1-9 6-9s6 3 6 9z"/><path d="M4 17h16"/><path d="M12 20a1.6 1.6 0 0 0 1.6-1.6h-3.2A1.6 1.6 0 0 0 12 20z"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+        <button class="carta" type="button" data-type="spring">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12"/><path d="M6 19h12"/><path d="M7 7h10l-10 4h10l-10 4h10"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+        <button class="carta" type="button" data-type="hourglass">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12"/><path d="M6 20h12"/><path d="M7 4c0 4 5 6 5 8s-5 4-5 8"/><path d="M17 4c0 4-5 6-5 8s5 4 5 8"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+        <button class="carta" type="button" data-type="chain">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="8" height="8" rx="4"/><rect x="12" y="8" width="8" height="8" rx="4"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+        <button class="carta" type="button" data-type="counterweight">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5"/><path d="M8 8h8l2 12H6z"/></svg>
+          <span class="nome"></span>
+          <span class="custo"></span>
+        </button>
+      </div>
+
+      <div id="popover" hidden>
+        <div id="pop-titulo"></div>
+        <div class="acoes">
+          <button id="pop-melhorar" type="button"></button>
+          <button id="pop-vender" type="button"></button>
         </div>
       </div>
 
