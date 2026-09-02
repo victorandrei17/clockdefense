@@ -197,7 +197,9 @@ Cada ciclo completo aumenta a velocidade de investida em 20%. Morre em 3–4 cic
 ## 8. Economia
 
 ### Corda (vida)
-Começa em **100**, máximo 100. Drena **0,4/s**, +0,1/s a cada hora (hora 6 drena 0,9/s). Cada morte devolve **+0,3**. Dano de inimigo subtrai direto. Zero = fim da partida.
+Começa em **100**, máximo 100. Drena **0,2/s**, +0,05/s a cada hora (hora 6 drena 0,45/s). Cada morte devolve **+1,5**. Dano de inimigo subtrai direto. Zero = fim da partida.
+
+> Estes números mudaram no ajuste do M5. Os originais — dreno 0,4/s crescendo 0,1, e +0,3 por morte — tornavam a partida **aritmeticamente invencível**: 234 de dreno nas seis horas contra 100 iniciais mais 0,3 × 248 mortes = 174, ou seja, derrota por 60 mesmo matando tudo sem deixar um único inimigo encostar no cubo. Medido também que nem zerar o dreno resolvia (13% de vitória), porque o termo dominante é o dano que vaza: com a Poeira tirando 4 e a corda em 100, o teto de vazamento é ~25 inimigos na partida inteira, independente de quantos existam. O que fecha a conta é a morte pagar bem: com **+1,5**, um jogador ativo vence 59% e enche o mostrador, e um que coloca três Martelos e para perde **100%** das vezes, sempre na hora 2 — que é a regra que importa.
 
 O dreno constante impede turtle: você **precisa** matar para não morrer.
 

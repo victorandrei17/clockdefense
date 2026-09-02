@@ -518,8 +518,60 @@ decidir com o jogo na mão.
 
 **Notas de balanceamento:**
 
-_A preencher depois de jogar._ Ponto de partida medido: 0/200 partidas
-sobrevivem as 6 horas com um bot que só compra Martelos.
+Primeiro relato de jogo: "a maioria das bolinhas inimigas atinge o núcleo".
+Investigado, e eram **três** problemas empilhados.
+
+**1. Legibilidade, não balanceamento.** O Martelo dispara toda vez que o
+ponteiro passa, com alvo ou sem — e ~5 de 6 passagens não encontram nada,
+porque uma peça cobre 15,5% das direções. Toda passagem acendia igual, então
+o jogo parecia disparar e não matar. Agora o clarão cheio é só de quem acerta,
+e cada peça mostra o alcance num anel apagado. A habilidade do jogo é cobrir o
+mostrador; sem ver os buracos não dá para jogar.
+
+**2. Hora 1 pedia mais do que ela dava.** 32 Poeiras = 128 de dano contra 76
+de corda útil, e 40 engrenagens compram 4 Martelos, que matam 11 quando eram
+precisos 13. Também troquei o intervalo fixo por orçamento por hora
+(`waves.data.js`): com intervalo fixo, quem decidia a dificuldade era se a
+última leva chegava antes de a hora fechar, um degrau que não tinha relação
+com o jogo.
+
+**3. A corda era aritmeticamente insustentável.** Este é o achado central:
+
+| | valor |
+|---|---|
+| dreno das 6 horas (0,4/s +0,1) | 234 |
+| corda inicial | 100 |
+| devolução por 248 mortes (+0,3) | 74 |
+| **saldo matando 100%** | **−60** |
+
+Derrota garantida sem um único inimigo encostar no cubo. Três medições
+descartaram os suspeitos óbvios:
+
+- **Não é falta de dano.** Teto medido: 6 Martelos no aro interno matam 60%,
+  mostrador cheio de Martelos 93%, cheio de Sinos 100%.
+- **Não é o dreno.** Com o dreno praticamente zerado (27 nas 6 horas), a
+  vitória sobe só para 13%.
+- **Não é o volume.** Reduzir as ondas *piora*: menos inimigos = menos
+  engrenagens = menos peças, e a taxa de abate exigida sobe. Com a corda em
+  100 e a Poeira tirando 4, o teto de vazamento é ~25 inimigos na partida
+  inteira, independente de quantos existam.
+
+O que fecha a conta é a morte pagar bem. Medido, com o dreno já reduzido:
+
+| +por morte | jogador ativo | jogador preguiçoso (3 Martelos, nunca compra) |
+|---|---|---|
+| +0,3 (original) | 0% | 0% |
+| +1,0 | 33%, hora 3 | 0% |
+| **+1,5** | **59%, hora 6, 18 peças** | **0%, morre na hora 2** |
+| +1,8 | 81% | 0% |
+
+**Aplicado:** dreno `0,4 → 0,2` com passo `0,1 → 0,05` (escolha do dono do
+projeto), e `perKill 0,3 → 1,5`. O jogador preguiçoso perde 100% das vezes em
+qualquer valor testado, então a regra do CLAUDE.md — "um jogador puramente
+defensivo deve perder" — continua de pé. SPEC §8 atualizado com o porquê.
+
+O bot que mede 59% é medíocre: coloca no primeiro slot livre, não escolhe
+ângulo e quase não sobe nível. Um jogador humano deve ficar acima disso.
 
 ---
 
@@ -623,6 +675,9 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
 | 2026-09-02 | M3 | Critério do M3 reescrito de "com o Martelo" para "com três Martelos", e o demo passou a ter 3 | Uma peça de alcance 70 cobre 15,5% das direções no aro interno e perde metade do que entra, então mata ~8% do fluxo: +2% de sobrevivência, invisível jogando. O teto é geométrico e independe do volume de inimigos, dreno ou custo — nenhum ajuste de balanceamento o move. Três dão +30%. Alternativa descartada: subir o alcance para ~110, que deixaria o Martelo dominante e criaria justamente o "compre mais martelos" que o SPEC §6 quer evitar. |
+| 2026-09-02 | M5 | Dreno da corda 0,4→0,2/s (passo 0,1→0,05) e `perKill` 0,3→1,5 | Com os números do SPEC a partida era invencível por aritmética: 234 de dreno contra 100 iniciais mais 74 de mortes = derrota por 60 matando 100%. Medido que zerar o dreno não resolvia (13% de vitória) nem reduzir o volume (piora, porque corta a renda). O termo dominante é o vazamento, e o que o compensa é a morte pagar. Com +1,5 o jogador ativo vence 59% e o preguiçoso perde 100%. SPEC §8 atualizado. |
+| 2026-09-02 | M5 | Ondas por orçamento de hora (`waves.data.js`) em vez de intervalo fixo | Com intervalo fixo, o que decidia a dificuldade era se a última leva chegava antes de a hora fechar — um degrau de 18 s para 22 s que não tinha relação com o jogo. |
+| 2026-09-02 | M5 | Disparo sem alvo é um tique discreto; anel de alcance sempre visível | ~5 de 6 passagens não encontram alvo, e todas acendiam igual: o jogo parecia disparar sem matar. O anel de alcance mostra os buracos de cobertura, que são a habilidade central do jogo. |
 | 2026-09-02 | M5 | A loja libera **tipos** de peça; o painel continua cobrando para colocar | O §9 põe "peças disponíveis" no pool da loja e o §6 já vende peças no painel. O §10 desempata: o desbloqueio do Contrapeso "adiciona a peça ao pool da loja", o que só faz sentido se a loja for o portão dos tipos. Assim as três seções ficam verdadeiras e o M4 não precisou mudar. |
 | 2026-09-02 | M5 | Telas moram em `run.phase`, sem `core/state.js` | `menu \| run \| shop \| gameover` num campo só. Um módulo separado seria indireção sem conteúdo; se o M8 trouxer META e transições de verdade, ele se justifica. |
 | 2026-09-02 | M5 | A onda fecha com a hora: inimigos em voo somem na virada | O SPEC §11 já conta com isso ao dizer que o snapshot sai na loja por não haver inimigo para serializar. |

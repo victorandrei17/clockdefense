@@ -27,7 +27,11 @@ export const BALANCE = {
   },
 
   // SPEC §8. A corda drena sozinha: um jogador puramente defensivo perde.
-  wind: { start: 100, drain: 0.4, drainPerHour: 0.1, perKill: 0.3 },
+  // Ajustado no portão do M5, medindo. O dreno caiu pela metade e cada morte
+  // devolve 5× mais: com os valores do SPEC original a partida era
+  // aritmeticamente invencível — 234 de dreno contra 174 disponíveis mesmo
+  // matando 100%. Ver as notas do M5 no PROGRESS.md.
+  wind: { start: 100, drain: 0.2, drainPerHour: 0.05, perKill: 1.5 },
 
   // SPEC §2. Seis horas de 60 s fecham a volta do ponteiro das horas.
   run: { hours: 6, hourSeconds: 60 },
