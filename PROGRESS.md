@@ -82,10 +82,10 @@ Referência: SPEC §4, §5.
 - [ ] `util/math.js`: `norm()`, `angleDiff()`, `polar()`, graus em toda a lógica
 - [ ] `game/board.js`: raios, 6 slots internos, 12 externos, mapa de colunas
 - [ ] `render/dial.js`: mostrador estático pré-renderizado **uma vez** em OffscreenCanvas
-- [ ] Ponteiros de segundos (60°/s), minutos (15°/s) e horas (1°/s) desenhados e girando
+- [ ] Ponteiros de segundos (60°/s), minutos (12°/s) e horas (1°/s) desenhados e girando
 - [ ] Slots vazios visíveis, os órfãos externos marcados diferente
 
-**Pronto quando:** o ponteiro dos segundos completa uma volta em 6 s e o das horas anda 60° em 60 s, cronometrado. O profiler mostra que `dial.js` não redesenha por frame.
+**Pronto quando:** o ponteiro dos segundos completa uma volta em 6 s, o dos minutos em 30 s, e o das horas anda 60° em 60 s — cronometrado. O profiler mostra que `dial.js` não redesenha por frame.
 
 **Notas:**
 
@@ -104,7 +104,7 @@ Referência: SPEC §5.
 - [ ] **Overlay de debug** (`F1` no desktop, 3 dedos no celular): ângulos dos ponteiros, hitboxes, alcance das peças, dt, fps, contagem de objetos vivos
 - [ ] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
 
-**Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada ~8 s no ângulo previsto.
+**Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada 7,5 s avançando 90°, fechando o ciclo nas colunas 0°, 90°, 180° e 270° a cada 30 s.
 
 O overlay não é extra. Ele é mantido até o fim do projeto.
 
@@ -140,7 +140,7 @@ Referência: SPEC §6.
 - [ ] Martelo, Sino, Mola, Ampulheta, Corrente, Contrapeso — os 3 níveis de cada
 - [ ] Corrente só funciona em coluna com par interno+externo; recusa visualmente a colocação inútil
 - [ ] Contrapeso acumulando e gastando cargas, com indicador visível
-- [ ] Multiplicadores aplicados: minutos ×4, Meia-Noite ×3
+- [ ] Multiplicadores aplicados: minutos ×5, Meia-Noite ×3
 
 **Pronto quando:** dá pra montar um mostrador do zero só com engrenagens ganhas em jogo, e cada peça se comporta de forma perceptivelmente diferente das outras.
 
@@ -157,6 +157,7 @@ Referência: SPEC §9.
 - [ ] 6 horas de 60 s, transição, ponteiro das horas como progresso
 - [ ] Dreno da corda escalando +0,1/s por hora
 - [ ] Loja pausada na virada: 4 cartas, reroll 5+3, pool condicional
+- [ ] Carta de velocidade escala segundos **e** minutos juntos, preservando a razão 5:1
 - [ ] Upgrade só aparece se a peça estiver no mostrador
 - [ ] Bônus de fim de hora `10 + 3×hora`
 - [ ] Botão "Dar corda" — nunca avança sozinho
@@ -269,4 +270,6 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
+| 2026-09-02 | pré-M1 | Ponteiro dos minutos 15°/s → **12°/s**, multiplicador ×4 → **×5** | O SPEC dizia que a Meia-Noite avançava 45° por alinhamento, mas com 15°/s o avanço real é 120°: só 3 colunas recebiam o bônus a partida inteira. `avanço = 360/(S/M − 1)` depende só da razão, e 12°/s dá razão 5, avanço de 90° e as 4 colunas 0°/90°/180°/270° — duas pareadas e duas órfãs. É o único valor inteiro limpo que melhora a cobertura; cobrir as 12 exigiria 300/17 ≈ 17,65°/s e multiplicador 3,4. Ver SPEC §5. |
+| 2026-09-02 | pré-M1 | Carta de loja passa a escalar o mecanismo inteiro, não só os segundos | Com +30% só nos segundos a razão vira 6,5, o avanço vira 65,45° e o alinhamento cai em 11 ângulos dos quais só 1 tem slot — comprar a carta desligava a Meia-Noite. Escalar segundos e minutos juntos preserva a razão e as 4 colunas, e só aperta a cadência (7,5 s → 5,77 s). Ver SPEC §9. |
 | 2026-09-02 | M0 | `src/data/balance.js` ainda não criado | O M0 não tem número de gameplay — 720×1280, dpr 2 e o clamp de 250 ms são técnicos. Criar o arquivo já com os valores do SPEC §15 seria adiantar M1–M5. O define `__DEV__` já está no build para o `window.BALANCE` entrar no M1. |
