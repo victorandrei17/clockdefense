@@ -1,0 +1,15 @@
+{
+  "name": "ultimo-relogio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "O Último Relógio — tower defense circular em Canvas 2D",
+  "type": "module",
+  "scripts": {
+    "dev": "node build.mjs --dev --serve",
+    "build": "node build.mjs",
+    "android": "npm run build && npx cap sync && npx cap open android"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
