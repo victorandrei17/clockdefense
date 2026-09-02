@@ -2,7 +2,7 @@ import { createLoop } from './core/loop.js';
 import { BALANCE } from './data/balance.js';
 import { createClock, advance } from './game/clock.js';
 import { createPiece, updatePieces, canPlace, pieceAt, upgrade, upgradeCost, sellValue } from './game/pieces.js';
-import { createEnemies, updateEnemies, damage } from './game/enemies.js';
+import { createEnemies, updateEnemies, damage, termitePenalty } from './game/enemies.js';
 import { createEconomy, tick as tickEconomy, spend, creditKill, pay, refund, gainWindMax } from './game/economy.js';
 import { createSpawner, updateSpawner, spawnGroup, startHour } from './game/spawner.js';
 import { createHud } from './render/ui/hud.js';
@@ -13,6 +13,7 @@ import { PIECES } from './data/pieces.data.js';
 import { BALANCE as B } from './data/balance.js';
 import { createRun, tickHour, hourBonus, nextHour, isLastHour, handSpeed } from './game/run.js';
 import * as rngMod from './util/rng.js';
+import * as enemiesMod from './game/enemies.js';
 import { createShop, open as openShop, roll, rerollCost, cardCost } from './game/shop.js';
 import { createShopUi } from './render/ui/shop.js';
 import { createScreens } from './render/ui/screens.js';
@@ -173,11 +174,13 @@ function update(dt) {
   // Só a fase 'run' faz o mundo andar. Na loja o jogo fica parado de
   // verdade — nada de loja em tempo real, que no celular é hostil (SPEC §9).
   if (run.phase === 'run') {
-    if (!debug.handsPaused) advance(clock, dt, handSpeed(run));
+    // Cupins vivos freiam so o ponteiro dos segundos — e e isso que quebra a
+    // razao 5:1 e desliga a Meia-Noite enquanto eles estiverem la.
+    if (!debug.handsPaused) advance(clock, dt, handSpeed(run), termitePenalty(enemies));
 
     tickEconomy(eco, dt, run.hour);
     updateSpawner(spawner, enemies, dt);
-    updateEnemies(enemies, dt, onReach);
+    updateEnemies(enemies, dt, mundoInimigo);
     updatePieces(pieces, clock, dt, world);
     if (clock.midnightStarted) spawnMidnight(clock.midnightAngle);
 
@@ -209,11 +212,16 @@ const world = {
   },
 };
 
-/** Inimigo alcançou o cubo: tira da corda e morre no impacto. */
-function onReach(e) {
-  spend(eco, e.damage);
-  spawnFlash(e.x, e.y, 30);
-}
+/** O que os inimigos precisam saber do mundo para se comportar. */
+const mundoInimigo = {
+  clock,
+  pieces,
+  /** Alcançou o cubo: tira da corda e morre no impacto. */
+  onReach(e) {
+    spend(eco, e.damage);
+    spawnFlash(e.x, e.y, 30);
+  },
+};
 
 // --- ciclo da partida ---------------------------------------------------
 
@@ -344,7 +352,11 @@ function render() {
 const loop = createLoop({ update, render });
 
 // Atalhos que o M2 deixou pendentes, agora que existe sistema para eles agir.
-debug.addShortcut('e', 'spawna Poeira', () => spawnGroup(spawner, enemies));
+// O marco pede "spawnar inimigo específico": T cicla o tipo, E solta.
+const TIPOS = ['dust', 'moth', 'rust', 'counterbeat', 'termite'];
+let tipoDebug = 0;
+debug.addShortcut('e', 'spawna inimigo', () => spawnGroup(spawner, enemies, TIPOS[tipoDebug]));
+debug.addShortcut('t', 'troca o tipo', () => { tipoDebug = (tipoDebug + 1) % TIPOS.length; });
 debug.addShortcut('g', '+100 engrenagens', () => { eco.gears += 100; });
 debug.addShortcut('i', 'invencibilidade', () => { eco.invincible = !eco.invincible; });
 debug.addShortcut('r', 'reinicia', comecar);
@@ -365,7 +377,7 @@ if (__DEV__) {
   window.__RELOGIO__ = {
     VIEW, canvas, ctx, loop, clock, renderer, pieces, debug,
     enemies, eco, spawner, panel, popover, canPlaceAt, run, shop,
-    comecar, fecharHora, seguir, comprar, trocarCartas, rngMod,
+    comecar, fecharHora, seguir, comprar, trocarCartas, rngMod, enemiesMod,
     // Coloca sem pagar nem checar. Só para teste e depuração.
     place: (type, ring, slot) => {
       const p = createPiece(type, ring, slot);

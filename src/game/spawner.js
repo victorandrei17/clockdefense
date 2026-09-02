@@ -9,17 +9,23 @@
 // retomar uma partida (M8).
 
 import { BALANCE as B } from '../data/balance.js';
-import { waveOf } from '../data/waves.data.js';
+import { rosterOf } from '../data/waves.data.js';
 import { spawn } from './enemies.js';
 
 export function createSpawner() {
-  return { restam: 0, gap: 0, prox: 0, angulo: 0, passo: 0 };
+  return { fila: [], gap: 0, prox: 0, angulo: 0, passo: 0 };
 }
 
-/** Começa a hora: distribui o orçamento pelo tempo dela. */
+/** Começa a hora: distribui o orçamento pelo tempo dela, embaralhado. */
 export function startHour(sp, hour) {
-  const n = waveOf(hour).dust;
-  sp.restam = n;
+  const fila = rosterOf(hour);
+  // Embaralha para os tipos virem misturados em vez de em blocos.
+  for (let i = fila.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [fila[i], fila[j]] = [fila[j], fila[i]];
+  }
+  sp.fila = fila;
+  const n = fila.length;
   // Deixa uma folga no fim para o último inimigo ainda chegar ao centro.
   const janela = B.run.hourSeconds - B.spawn.tailSeconds;
   sp.gap = janela / n;
@@ -32,20 +38,17 @@ export function startHour(sp, hour) {
 }
 
 export function updateSpawner(sp, pool, dt) {
-  if (sp.restam <= 0) return;
+  if (!sp.fila.length) return;
   sp.prox -= dt;
   if (sp.prox > 0) return;
   sp.prox += sp.gap;
-  sp.restam--;
   const jitter = (Math.random() - 0.5) * 40;
-  spawn(pool, 'dust', sp.angulo + jitter);
+  spawn(pool, sp.fila.pop(), sp.angulo + jitter);
   sp.angulo += sp.passo;
 }
 
-/** Solta um punhado agora. Só para o atalho de debug. */
-export function spawnGroup(sp, pool, n = 8) {
-  for (let i = 0; i < n; i++) {
-    spawn(pool, 'dust', Math.random() * 360);
-  }
+/** Solta um punhado agora. Só para os atalhos de debug. */
+export function spawnGroup(sp, pool, tipo = 'dust', n = 6) {
+  for (let i = 0; i < n; i++) spawn(pool, tipo, Math.random() * 360);
   return n;
 }

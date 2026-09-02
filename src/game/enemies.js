@@ -23,6 +23,15 @@ export function createEnemies() {
     hit: 0,        // 1 no instante do dano, decai — só feedback visual
     slowFactor: 0, // 0 a 1, quanto a Ampulheta tira da velocidade
     slowTime: 0,
+    // Traça: ângulo de origem e idade, para o ziguezague.
+    homeAngle: 0,
+    age: 0,
+    // Ferrugem: peça que está devorando.
+    host: null,
+    // Contratempo: parado enquanto um ponteiro estiver em cima.
+    frozen: false,
+    // Cupim: já alcançou o ponteiro dos segundos?
+    riding: false,
   }));
 }
 
@@ -40,6 +49,11 @@ export function spawn(pool, type, angle) {
   e.hit = 0;
   e.slowFactor = 0;
   e.slowTime = 0;
+  e.homeAngle = e.angle;
+  e.age = 0;
+  e.host = null;
+  e.frozen = false;
+  e.riding = false;
   place(e);
   return e;
 }
@@ -51,33 +65,139 @@ function place(e) {
   e.y = B.board.cy - e.radius * Math.cos(a);
 }
 
+// --- comportamentos, um por tipo. SPEC §7. ---------------------------------
+
+function passo(e, dt) {
+  return e.speed * (1 - e.slowFactor) * dt;
+}
+
+const BEHAVIOUR = {
+  /** Poeira: linha reta ao centro. */
+  dust(e, dt) {
+    e.radius -= passo(e, dt);
+  },
+
+  /** Traça: mesma linha, com ziguezague senoidal por cima. */
+  moth(e, dt) {
+    const d = ENEMIES.moth;
+    e.radius -= passo(e, dt);
+    // Amplitude é em px; convertida para graus no raio atual, o desvio
+    // aparente fica constante em vez de abrir perto da borda.
+    const off = (d.wobbleAmp / Math.max(20, e.radius)) * (180 / Math.PI);
+    e.angle = norm(e.homeAngle + off * Math.sin((e.age / d.wobblePeriod) * Math.PI * 2));
+  },
+
+  /**
+   * Ferrugem: vai até a peça mais próxima, gruda e a desativa. Não vai ao
+   * centro e não tira corda — o custo é perder a peça até matá-la.
+   */
+  rust(e, dt, ctx) {
+    if (e.host) {
+      // Se a peça sumiu (vendida), solta e procura outra.
+      if (!ctx.pieces.includes(e.host)) { e.host = null; return; }
+      return;
+    }
+    const alvo = maisPerto(ctx.pieces, e.x, e.y);
+    if (!alvo) { e.radius -= passo(e, dt); return; }
+
+    const dx = alvo.x - e.x;
+    const dy = alvo.y - e.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= e.drawRadius + 4) {
+      e.host = alvo;
+      alvo.disabled = true;
+      return;
+    }
+    const nx = e.x + (dx / dist) * passo(e, dt);
+    const ny = e.y + (dy / dist) * passo(e, dt);
+    e.radius = Math.hypot(nx - B.board.cx, B.board.cy - ny);
+    e.angle = norm(Math.atan2(nx - B.board.cx, B.board.cy - ny) * (180 / Math.PI));
+    e.homeAngle = e.angle;
+  },
+
+  /**
+   * Contratempo: órbita anti-horária com raio encolhendo, e trava enquanto
+   * qualquer ponteiro estiver a menos de 8° dele. Fácil de segurar, difícil
+   * de matar sem dano concentrado.
+   */
+  counterbeat(e, dt, ctx) {
+    const d = ENEMIES.counterbeat;
+    const c = ctx.clock;
+    // Só os ponteiros que alcançam algum aro congelam. O das horas anda a
+    // 1°/s e é "só indicador" (SPEC §5): incluí-lo prendia o Contratempo por
+    // ~16 s, porque congelado ele não consegue se afastar do que o congelou.
+    e.frozen = [c.second, c.minute]
+      .some((a) => Math.abs(angleDiff(a, e.angle)) < d.freezeArc);
+    if (e.frozen) return;
+    e.angle = norm(e.angle - d.orbit * dt); // anti-horário
+    e.homeAngle = e.angle;
+    e.radius -= d.shrink * (1 - e.slowFactor) * dt;
+  },
+
+  /**
+   * Cupim: voa até o raio de carona e gruda no ponteiro dos segundos, girando
+   * junto. Ignora a corda — o dano dele é no motor, não na vida.
+   */
+  termite(e, dt, ctx) {
+    const d = ENEMIES.termite;
+    if (!e.riding) {
+      e.radius -= passo(e, dt);
+      if (e.radius <= d.ride) { e.radius = d.ride; e.riding = true; }
+    }
+    if (e.riding) {
+      e.radius = d.ride;
+      e.angle = ctx.clock.second;
+      e.homeAngle = e.angle;
+    }
+  },
+};
+
+function maisPerto(pieces, x, y) {
+  let best = null;
+  let bestD2 = Infinity;
+  for (const p of pieces) {
+    const dx = p.x - x;
+    const dy = p.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) { bestD2 = d2; best = p; }
+  }
+  return best;
+}
+
 /**
- * Move todo mundo em direção ao centro. Quem alcança o cubo causa dano e
- * morre no impacto — `onReach(enemy)` é chamado nesse caso.
+ * Roda o comportamento de cada inimigo. Quem alcança o cubo chama
+ * `ctx.onReach` e morre no impacto; a Ferrugem e o Cupim nunca chegam lá.
  */
-export function updateEnemies(pool, dt, onReach) {
+export function updateEnemies(pool, dt, ctx) {
   const items = pool.items;
   for (let i = 0; i < items.length; i++) {
     const e = items[i];
     if (!e.active) continue;
 
+    e.age += dt;
     if (e.hit > 0) e.hit = Math.max(0, e.hit - dt / 0.12);
-
     if (e.slowTime > 0) {
       e.slowTime -= dt;
       if (e.slowTime <= 0) e.slowFactor = 0;
     }
 
-    e.radius -= e.speed * (1 - e.slowFactor) * dt;
+    BEHAVIOUR[e.type](e, dt, ctx);
+
     if (e.radius <= B.board.hub) {
       e.radius = B.board.hub;
       place(e);
-      onReach(e);
-      pool.release(e);
+      ctx.onReach(e);
+      release(pool, e);
       continue;
     }
     place(e);
   }
+}
+
+/** Solta o inimigo, devolvendo a peça que ele estivesse devorando. */
+function release(pool, e) {
+  if (e.host) { e.host.disabled = false; e.host = null; }
+  pool.release(e);
 }
 
 /** Aplica dano. Devolve true se matou. */
@@ -85,7 +205,7 @@ export function damage(pool, e, amount) {
   e.hp -= amount;
   e.hit = 1;
   if (e.hp > 0) return false;
-  pool.release(e);
+  release(pool, e);
   return true;
 }
 
@@ -121,7 +241,7 @@ export function push(pool, e, distance) {
   if (e.radius <= B.board.hub) {
     // Empurrado para dentro do cubo: some sem causar dano, é o efeito
     // pretendido do nível 3 da Mola virado para dentro.
-    pool.release(e);
+    release(pool, e);
     return true;
   }
   return false;
@@ -157,4 +277,15 @@ export function eachInColumn(pool, angle, r0, r1, width, fn) {
     const off = Math.abs(e.radius * Math.sin(angleDiff(angle, e.angle) * DEG));
     if (off <= width) fn(e);
   }
+}
+
+/** Cupins vivos penalizam o ponteiro dos segundos. SPEC §7. */
+export function termitePenalty(pool) {
+  const d = ENEMIES.termite;
+  let n = 0;
+  const items = pool.items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].active && items[i].type === 'termite' && items[i].riding) n++;
+  }
+  return Math.min(d.slowFloor, d.slowEach * n);
 }

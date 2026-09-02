@@ -39,7 +39,7 @@ export const BALANCE = {
   // SPEC §8. Engrenagens por morte. Os outros inimigos entram no M6.
   // `start` é provisório: sem engrenagens iniciais não dá para colocar a
   // primeira peça, e sem peça não se mata nada para ganhar engrenagens.
-  gears: { start: 40, dust: 2 },
+  gears: { start: 40, dust: 2, moth: 3, rust: 6, counterbeat: 8, termite: 10, cuckoo: 60 },
 
   // SPEC §9.
   shop: {

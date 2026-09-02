@@ -19,13 +19,22 @@ export function createClock() {
  * Avança os ponteiros. `dt` já vem clampado pelo loop, então uma volta do
  * background não faz o relógio saltar mais do que o passo fixo permite.
  */
-export function advance(clock, dt, speedMul = 1) {
+/**
+ * @param {number} speedMul   upgrade de mecanismo: escala segundos E minutos
+ * @param {number} secondSlow  penalidade dos Cupins: só nos segundos
+ *
+ * O Cupim quebra de propósito a razão 5:1 que a carta de loja preserva. Não é
+ * inconsistência: é o ataque dele. Com o ponteiro dos segundos fora de razão,
+ * o alinhamento da Meia-Noite deixa de cair em cima de slot e o pico do jogo
+ * some enquanto ele estiver vivo. Ver SPEC §5 e §7.
+ */
+export function advance(clock, dt, speedMul = 1, secondSlow = 0) {
   clock.prevSecond = clock.second;
   clock.prevMinute = clock.minute;
   clock.prevHour = clock.hour;
 
   // O ponteiro das horas nunca escala: ele mede a partida (SPEC §5, §9).
-  clock.second = norm(clock.second + B.hands.second.speed * speedMul * dt);
+  clock.second = norm(clock.second + B.hands.second.speed * speedMul * (1 - secondSlow) * dt);
   clock.minute = norm(clock.minute + B.hands.minute.speed * speedMul * dt);
   clock.hour   = norm(clock.hour   + B.hands.hour.speed   * dt);
 

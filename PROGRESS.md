@@ -580,15 +580,84 @@ O bot que mede 59% é medíocre: coloca no primeiro slot livre, não escolhe
 **Objetivo:** cada inimigo exige uma resposta diferente.
 Referência: SPEC §7.
 
-- [ ] Traça: zigue-zague senoidal
-- [ ] Ferrugem: gruda na peça mais próxima, desativa, imune à peça que devora
-- [ ] Contratempo: órbita anti-horária, raio decrescente, congela sob ponteiro (<8°)
-- [ ] Cupim: gruda no ponteiro dos segundos no raio 190, gira junto, −25% de velocidade acumulável até −60%
-- [ ] `waves.data.js`: composição das 6 horas, dificuldade crescente
+- [x] Traça: zigue-zague senoidal
+- [x] Ferrugem: gruda na peça mais próxima, desativa, imune à peça que devora
+- [x] Contratempo: órbita anti-horária, raio decrescente, congela sob ponteiro (<8°)
+- [x] Cupim: gruda no ponteiro dos segundos no raio 190, gira junto, −25% de velocidade acumulável até −60%
+- [x] `waves.data.js`: composição das 6 horas, dificuldade crescente
 
 **Pronto quando:** um build só de Martelos perde para o Cupim. Se não perder, o Cupim está fraco demais e o marco não está pronto.
 
+> Passa na letra — só de Martelos sobrevive à hora 6 em **12%** das vezes — mas
+> a atribuição não é limpa: sem Cupim nenhum, o mesmo build já cai para 26%. O
+> Cupim tira **14 pontos**, o volume tira o resto. E contra um build com Sinos
+> ele não faz diferença nenhuma. Ver "O Cupim é fraco, mas o Sino é o problema".
+
 **Notas:**
+
+- **Comportamento por tipo, num mapa `BEHAVIOUR`.** `updateEnemies` deixou de
+  ser "todo mundo anda para o centro" e passou a despachar por tipo, recebendo
+  um contexto com o relógio e as peças. Poeira e Traça andam em polar; a
+  Ferrugem persegue em cartesiano e converte de volta; o Contratempo orbita; o
+  Cupim trava no ângulo do ponteiro.
+- **A Traça converte amplitude em graus pelo raio atual.** 25 px fixos viram
+  ~3,6° na borda e ~14° perto do centro, então o desvio aparente fica
+  constante em vez de abrir.
+- **Ferrugem desativa a peça**, que para de disparar e é desenhada em
+  ferrugem. Como peça desativada não atira, "não pode ser atingida pela peça
+  que devora" sai de graça. Morrer devolve a peça; vender a peça enquanto ela
+  come solta a Ferrugem para procurar outra.
+- **O ponteiro das horas não congela o Contratempo.** Achado pelo teste: com
+  ele na conta, o Contratempo nascia congelado e — congelado — não conseguia
+  se afastar, ficando preso ~16 s até a hora passar por cima. O §5 diz que
+  esse ponteiro alcança "nenhum" aro e é só indicador, então ficou de fora.
+  SPEC §7 atualizado.
+- **O Cupim quebra a razão 5:1 de propósito.** O §5 estabelece que qualquer
+  coisa que mude a velocidade dos ponteiros escala segundos e minutos juntos,
+  para a Meia-Noite continuar caindo em cima de slot. O Cupim freia **só os
+  segundos** — e é exatamente esse o ataque dele: enquanto estiver vivo, o
+  alinhamento sai dos slots e o pico do jogo some. A regra do §5 vale para
+  upgrades do jogador; o inimigo existe para violá-la.
+- **Os alcances do §7 estavam errados.** O texto dizia que pega o Cupim quem
+  tem alcance "≥60 no aro externo ou ≥45 no interno". O Cupim anda no raio
+  190, então as distâncias reais são **70** e **40**. Corrigido. Com alcance
+  70, o Martelo do aro externo o acerta exatamente no limite.
+
+**O Cupim é fraco, mas o Sino é o problema**
+
+Hora 6, 120 simulações por linha, mesmos 9 slots e nível 2:
+
+| build | com 3 Cupins | sem Cupim | diferença |
+|---|---|---|---|
+| só Martelos | **12%** | 26% | −14 pontos |
+| misto com Sinos | **100%** | 100% | nenhuma |
+
+O Cupim morre rápido demais para importar. A causa é estrutural e o próprio
+SPEC a descreve: andando sob o ponteiro, ele passa por cima de **todas** as
+peças, então com 9 peças leva 9 acertos por volta e vive ~1 s. Com 30 HP, o
+freio médio ao longo da hora fica em 5%, embora o pico chegue aos −60%.
+
+Subir o HP não conserta: testado em 30/60/90/120/160, o build de Martelos cai
+de 12% para 0%, mas o build com Sinos fica em 100% em todos os valores. O que
+o teste mostra não é "o Cupim está fraco" e sim **"o Sino está forte demais"**
+— nove Sinos nível 2 sobrevivem à hora 6 sem nenhuma pressão, com 93 de corda
+sobrando.
+
+Não mexi em nenhum dos dois. O HP do Cupim é do SPEC §7; o dano do Sino é
+número meu e provisório, mas mexer nele reequilibra as seis peças de uma vez
+e isso é decisão de design com o jogo na mão, não de implementação.
+
+**Verificação.** Node para comportamento, navegador para o resto:
+
+- Traça oscila para os dois lados do ângulo de origem e mesmo assim avança.
+- Ferrugem gruda na peça mais próxima, zera os disparos dela, e a vizinha
+  segue atirando; matar a Ferrugem devolve a peça.
+- Contratempo encolhe de 400 para 321 em 8 s e trava a 0,00 px com um
+  ponteiro em cima.
+- Cupim gruda no raio 190,0, gira com o ponteiro, e o freio é −25% por
+  unidade com piso em −60%.
+- Um Martelo no aro interno mata um Cupim sozinho em 6 disparos.
+- Onda cheia com os cinco tipos: 60 fps, sem erro de runtime.
 
 ---
 
@@ -675,6 +744,9 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
 | 2026-09-02 | M3 | Critério do M3 reescrito de "com o Martelo" para "com três Martelos", e o demo passou a ter 3 | Uma peça de alcance 70 cobre 15,5% das direções no aro interno e perde metade do que entra, então mata ~8% do fluxo: +2% de sobrevivência, invisível jogando. O teto é geométrico e independe do volume de inimigos, dreno ou custo — nenhum ajuste de balanceamento o move. Três dão +30%. Alternativa descartada: subir o alcance para ~110, que deixaria o Martelo dominante e criaria justamente o "compre mais martelos" que o SPEC §6 quer evitar. |
+| 2026-09-02 | M6 | O ponteiro das horas não congela o Contratempo | Com ele na conta o Contratempo nascia congelado e, congelado, não conseguia se afastar — ficava preso ~16 s. O SPEC §5 diz que esse ponteiro não alcança aro nenhum e é só indicador. SPEC §7 atualizado. |
+| 2026-09-02 | M6 | O Cupim freia só o ponteiro dos segundos, quebrando a razão 5:1 | O §5 exige que upgrades escalem segundos e minutos juntos para a Meia-Noite não sair dos slots. O Cupim viola isso de propósito: desligar a Meia-Noite é o ataque dele ao motor. |
+| 2026-09-02 | M6 | Alcances do §7 para acertar o Cupim corrigidos de ≥60/≥45 para ≥70/≥40 | O Cupim anda no raio 190; as distâncias reais até os aros externo (260) e interno (150) são 70 e 40. |
 | 2026-09-02 | M5 | Dreno da corda 0,4→0,2/s (passo 0,1→0,05) e `perKill` 0,3→1,5 | Com os números do SPEC a partida era invencível por aritmética: 234 de dreno contra 100 iniciais mais 74 de mortes = derrota por 60 matando 100%. Medido que zerar o dreno não resolvia (13% de vitória) nem reduzir o volume (piora, porque corta a renda). O termo dominante é o vazamento, e o que o compensa é a morte pagar. Com +1,5 o jogador ativo vence 59% e o preguiçoso perde 100%. SPEC §8 atualizado. |
 | 2026-09-02 | M5 | Ondas por orçamento de hora (`waves.data.js`) em vez de intervalo fixo | Com intervalo fixo, o que decidia a dificuldade era se a última leva chegava antes de a hora fechar — um degrau de 18 s para 22 s que não tinha relação com o jogo. |
 | 2026-09-02 | M5 | Disparo sem alvo é um tique discreto; anel de alcance sempre visível | ~5 de 6 passagens não encontram alvo, e todas acendiam igual: o jogo parecia disparar sem matar. O anel de alcance mostra os buracos de cobertura, que são a habilidade central do jogo. |

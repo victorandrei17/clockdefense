@@ -177,9 +177,9 @@ Todos surgem no raio 400 e vão ao centro. Ao alcançar o cubo, causam dano na c
 
 **Ferrugem** — 45 px/s, 20 HP, dano 0. Não vai ao centro: vai até a **peça mais próxima**, gruda e a **desativa até ser morta**. Não pode ser atingida pela peça que devora — um vizinho precisa resolver. Ensina a espalhar defesas.
 
-**Contratempo** — órbita **anti-horária** num raio que decresce 12 px/s. 25 HP, dano 8. **Só se move quando nenhum ponteiro está a menos de 8° dele.** Fácil de travar, difícil de matar sem dano concentrado.
+**Contratempo** — órbita **anti-horária** num raio que decresce 12 px/s. 25 HP, dano 8. **Só se move quando nenhum ponteiro que alcança um aro está a menos de 8° dele** — ou seja, segundos, minutos e Cronógrafo. O das horas não conta: ele anda a 1°/s e não alcança aro nenhum, então prenderia o Contratempo por ~16 s de cada vez, já que congelado ele não consegue se afastar do que o congelou. Fácil de travar, difícil de matar sem dano concentrado.
 
-**Cupim** — ignora a corda. Voa até o **ponteiro dos segundos**, gruda no raio 190 e gira junto. Enquanto vivo: **−25% na velocidade do ponteiro dos segundos** (acumula, piso −60%). Como está sempre sob o ponteiro, passa por cima de todas as peças; qualquer peça com alcance ≥60 no aro externo ou ≥45 no interno o acerta. 30 HP.
+**Cupim** — ignora a corda. Voa até o **ponteiro dos segundos**, gruda no raio 190 e gira junto. Enquanto vivo: **−25% na velocidade do ponteiro dos segundos** (acumula, piso −60%). Como está sempre sob o ponteiro, passa por cima de todas as peças; qualquer peça com alcance ≥70 no aro externo ou ≥40 no interno o acerta. 30 HP.
 É o inimigo mais importante do MVP: **ataca o motor, não a vida.** Cria uma segunda coisa para proteger e uma segunda forma de perder.
 
 ### O Cuco (chefe, 6ª hora)

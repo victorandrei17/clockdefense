@@ -11,20 +11,91 @@ import { innerSlots, outerSlots } from '../game/board.js';
 export function createRenderer(ctx, view) {
   const dial = createDial();
 
-  /** Poeira: um grão irregular vindo da borda. Arte de verdade é do M9. */
-  function enemy(e) {
+  // Cada inimigo tem silhueta própria: o jogador precisa reconhecer a ameaça
+  // antes de ler qualquer número. Arte de verdade é do M9.
+  function disco(e, cor) {
     ctx.beginPath();
     ctx.arc(e.x, e.y, e.drawRadius, 0, Math.PI * 2);
-    ctx.fillStyle = e.hit > 0 ? OSSO : FERRUGEM;
-    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = e.hit > 0 ? OSSO : cor;
+    ctx.globalAlpha = 0.88;
     ctx.fill();
-
     ctx.beginPath();
-    ctx.arc(e.x - e.drawRadius * 0.3, e.y - e.drawRadius * 0.3, e.drawRadius * 0.42, 0, Math.PI * 2);
+    ctx.arc(e.x - e.drawRadius * 0.3, e.y - e.drawRadius * 0.3, e.drawRadius * 0.4, 0, Math.PI * 2);
     ctx.fillStyle = OSSO;
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.16;
     ctx.fill();
     ctx.globalAlpha = 1;
+  }
+
+  const ENEMY_ART = {
+    dust(e) { disco(e, FERRUGEM); },
+
+    /** Duas asas girando: lê como algo que voa torto. */
+    moth(e) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(e.age * 6);
+      ctx.fillStyle = e.hit > 0 ? OSSO : '#A86552';
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.ellipse(-e.drawRadius * 0.6, 0, e.drawRadius * 0.85, e.drawRadius * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(e.drawRadius * 0.6, 0, e.drawRadius * 0.85, e.drawRadius * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    },
+
+    /** Bolha escura; ganha um anel enquanto devora uma peça. */
+    rust(e) {
+      disco(e, '#6E3524');
+      if (!e.host) return;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.drawRadius + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = FERRUGEM;
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    },
+
+    /** Anel vazado. Fica em patina quando um ponteiro o congela. */
+    counterbeat(e) {
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.drawRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = e.hit > 0 ? OSSO : (e.frozen ? PATINA : FERRUGEM);
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.drawRadius * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = e.frozen ? PATINA : FERRUGEM;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    },
+
+    /** Losango alinhado ao ponteiro. Âmbar porque ataca o motor. */
+    termite(e) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(e.angle * DEG);
+      ctx.beginPath();
+      ctx.moveTo(0, -e.drawRadius * 1.6);
+      ctx.lineTo(e.drawRadius * 0.8, 0);
+      ctx.lineTo(0, e.drawRadius * 1.6);
+      ctx.lineTo(-e.drawRadius * 0.8, 0);
+      ctx.closePath();
+      ctx.fillStyle = e.hit > 0 ? OSSO : AMBAR;
+      ctx.globalAlpha = 0.95;
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    },
+  };
+
+  function enemy(e) {
+    ENEMY_ART[e.type](e);
   }
 
   // Glifos das peças, desenhados centrados na origem numa caixa de ~20 px.
@@ -140,12 +211,14 @@ export function createRenderer(ctx, view) {
 
     ctx.beginPath();
     ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
-    ctx.strokeStyle = p.flash > 0 ? AMBAR : LATAO;
-    ctx.globalAlpha = 0.6 + 0.4 * p.flash;
+    // Peça devorada por uma Ferrugem tem de parecer morta.
+    const cor = p.disabled ? FERRUGEM : (p.flash > 0 ? AMBAR : LATAO);
+    ctx.strokeStyle = cor;
+    ctx.globalAlpha = p.disabled ? 0.85 : 0.6 + 0.4 * p.flash;
     ctx.lineWidth = 1.2 + 1.6 * p.flash;
     ctx.stroke();
 
-    glyph(p.type, p.x, p.y, 0.72, p.flash > 0 ? AMBAR : LATAO, 0.85 + 0.15 * p.flash, 1.6);
+    glyph(p.type, p.x, p.y, 0.72, cor, p.disabled ? 0.4 : 0.85 + 0.15 * p.flash, 1.6);
 
     // Nível: um traço por nível acima do primeiro, embaixo da peça.
     for (let i = 1; i < p.level; i++) {

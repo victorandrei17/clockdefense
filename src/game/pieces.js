@@ -36,6 +36,8 @@ export function createPiece(type, ring, slotIndex, level = 1) {
     invested: data.cost,
     cooldown: 0,
     flash: 0,
+    // Ferrugem grudada desativa a peça até ser morta.
+    disabled: false,
     shots: 0,
     lastMult: 0,
     lastHand: '',
@@ -152,6 +154,9 @@ export function updatePieces(pieces, clock, dt, world) {
 
   for (const p of pieces) {
     const st = stats(p);
+
+    // Peça devorada por uma Ferrugem não faz nada até um vizinho resolver.
+    if (p.disabled) { p.flash = 0; continue; }
 
     if (p.flash > 0) p.flash = Math.max(0, p.flash - dt / 0.18);
 
