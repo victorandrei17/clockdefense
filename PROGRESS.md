@@ -79,15 +79,60 @@ máquina num Android real e confirmar os 60 fps lá. No emulado passou tudo.
 **Objetivo:** o relógio existe e gira. Ainda não é jogo.
 Referência: SPEC §4, §5.
 
-- [ ] `util/math.js`: `norm()`, `angleDiff()`, `polar()`, graus em toda a lógica
-- [ ] `game/board.js`: raios, 6 slots internos, 12 externos, mapa de colunas
-- [ ] `render/dial.js`: mostrador estático pré-renderizado **uma vez** em OffscreenCanvas
-- [ ] Ponteiros de segundos (60°/s), minutos (15°/s) e horas (1°/s) desenhados e girando
-- [ ] Slots vazios visíveis, os órfãos externos marcados diferente
+- [x] `util/math.js`: `norm()`, `angleDiff()`, `polar()`, graus em toda a lógica
+- [x] `game/board.js`: raios, 6 slots internos, 12 externos, mapa de colunas
+- [x] `render/dial.js`: mostrador estático pré-renderizado **uma vez** em OffscreenCanvas
+- [x] Ponteiros de segundos (60°/s), minutos (12°/s) e horas (1°/s) desenhados e girando
+- [x] Slots vazios visíveis, os órfãos externos marcados diferente
 
-**Pronto quando:** o ponteiro dos segundos completa uma volta em 6 s e o das horas anda 60° em 60 s, cronometrado. O profiler mostra que `dial.js` não redesenha por frame.
+**Pronto quando:** o ponteiro dos segundos completa uma volta em 6 s, o dos minutos em 30 s, e o das horas anda 60° em 60 s — cronometrado. O profiler mostra que `dial.js` não redesenha por frame.
 
 **Notas:**
+
+Arquivos novos: `src/data/balance.js`, `src/util/math.js`, `src/game/board.js`,
+`src/game/clock.js`, `src/render/palette.js`, `src/render/dial.js`,
+`src/render/renderer.js`. `src/main.js` virou só o bootstrap.
+
+- **`balance.js` entrou** com as seções `board` e `hands` completas, como no
+  SPEC §15. As outras (`fire`, `wind`, `run`, `shop`, `gears`) entram com o
+  marco que as usa — a regra segue a mesma do M0. Exposto em `window.BALANCE`
+  no build de dev.
+- **Convenção de ângulo.** `polar()` põe o seno no x e o cosseno negado no y,
+  porque 0° aponta para cima e o y da tela cresce para baixo. Os ponteiros não
+  usam `polar()`: são desenhados por `translate` + `rotate`, o que evita alocar
+  um ponto por frame e já resolve a cauda atrás do eixo.
+- **Órfãos marcados por ausência, não por enfeite.** As 6 colunas pareadas
+  ganham um raio ligando slot interno e externo; as 6 órfãs não têm raio e o
+  contorno do slot é tracejado e mais apagado. Quem olha o mostrador vê onde a
+  Corrente vai caber, sem tutorial.
+- **Números dentro dos slots externos.** Além de decorar, viram rótulo: dá para
+  dizer "martelo no 3". O slot 0 é o "12".
+- **Luz do centro** (SPEC §13) virou a função `light(r)`, que multiplica o alpha
+  de tudo: 1,0 no eixo caindo para 0,45 na borda. Não há `shadowBlur` em lugar
+  nenhum.
+- **Cubo central** ganhou o quadrado de dar corda no meio — o verbo do jogo.
+- **Rebuild do mostrador.** `dial.resize(escala)` compara o tamanho em pixels
+  já arredondado e só rerrasteriza se mudou, então resize repetido no mesmo
+  tamanho não custa nada. Fallback para `<canvas>` comum se não houver
+  `OffscreenCanvas`.
+- **Aro de capítulo em 287.** Primeira versão punha o aro secundário em 280 e
+  ele encostava nos slots externos, que terminam em 278. Em 287 ele fecha a
+  base das marcações de hora, como num mostrador de verdade.
+
+**Verificação.** Chromium headless, medindo os ponteiros por 13 s reais com
+desempacotamento de wraparound:
+
+- segundos 60,25°/s → volta em **5,99 s** (alvo 6)
+- minutos 12,05°/s → volta em **29,93 s** (alvo 30)
+- horas 1,00°/s → **60,1° em 60 s** (alvo 60)
+- `dial.js` rasterizado **1 vez** em 784 updates: não redesenha por frame.
+- Girar o aparelho rerrasteriza **exatamente uma vez**, e nada depois disso.
+- Sem erros de runtime; build de produção sem `BALANCE`, `__RELOGIO__` nem o
+  contorno de debug.
+
+O desvio de ~0,4% acima do alvo é artefato da janela de amostragem, não do
+relógio: o acumulador roda um passo a mais que o tempo de parede dentro do
+intervalo medido.
 
 ---
 
@@ -104,7 +149,7 @@ Referência: SPEC §5.
 - [ ] **Overlay de debug** (`F1` no desktop, 3 dedos no celular): ângulos dos ponteiros, hitboxes, alcance das peças, dt, fps, contagem de objetos vivos
 - [ ] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
 
-**Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada ~8 s no ângulo previsto.
+**Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada 7,5 s avançando 90°, fechando o ciclo nas colunas 0°, 90°, 180° e 270° a cada 30 s.
 
 O overlay não é extra. Ele é mantido até o fim do projeto.
 
@@ -140,7 +185,7 @@ Referência: SPEC §6.
 - [ ] Martelo, Sino, Mola, Ampulheta, Corrente, Contrapeso — os 3 níveis de cada
 - [ ] Corrente só funciona em coluna com par interno+externo; recusa visualmente a colocação inútil
 - [ ] Contrapeso acumulando e gastando cargas, com indicador visível
-- [ ] Multiplicadores aplicados: minutos ×4, Meia-Noite ×3
+- [ ] Multiplicadores aplicados: minutos ×5, Meia-Noite ×3
 
 **Pronto quando:** dá pra montar um mostrador do zero só com engrenagens ganhas em jogo, e cada peça se comporta de forma perceptivelmente diferente das outras.
 
@@ -157,6 +202,7 @@ Referência: SPEC §9.
 - [ ] 6 horas de 60 s, transição, ponteiro das horas como progresso
 - [ ] Dreno da corda escalando +0,1/s por hora
 - [ ] Loja pausada na virada: 4 cartas, reroll 5+3, pool condicional
+- [ ] Carta de velocidade escala segundos **e** minutos juntos, preservando a razão 5:1
 - [ ] Upgrade só aparece se a peça estiver no mostrador
 - [ ] Bônus de fim de hora `10 + 3×hora`
 - [ ] Botão "Dar corda" — nunca avança sozinho
@@ -269,4 +315,7 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
+| 2026-09-02 | M1 | `src/render/palette.js` criado, fora da estrutura do SPEC §3 | A paleta do §13 é usada por `dial.js` e `renderer.js` e não é número de gameplay, então não cabe em `balance.js`. Um módulo de 6 constantes evita repetir hex em dois arquivos. O `index.html` mantém as mesmas cores como CSS vars para o HUD. |
+| 2026-09-02 | pré-M1 | Ponteiro dos minutos 15°/s → **12°/s**, multiplicador ×4 → **×5** | O SPEC dizia que a Meia-Noite avançava 45° por alinhamento, mas com 15°/s o avanço real é 120°: só 3 colunas recebiam o bônus a partida inteira. `avanço = 360/(S/M − 1)` depende só da razão, e 12°/s dá razão 5, avanço de 90° e as 4 colunas 0°/90°/180°/270° — duas pareadas e duas órfãs. É o único valor inteiro limpo que melhora a cobertura; cobrir as 12 exigiria 300/17 ≈ 17,65°/s e multiplicador 3,4. Ver SPEC §5. |
+| 2026-09-02 | pré-M1 | Carta de loja passa a escalar o mecanismo inteiro, não só os segundos | Com +30% só nos segundos a razão vira 6,5, o avanço vira 65,45° e o alinhamento cai em 11 ângulos dos quais só 1 tem slot — comprar a carta desligava a Meia-Noite. Escalar segundos e minutos juntos preserva a razão e as 4 colunas, e só aperta a cadência (7,5 s → 5,77 s). Ver SPEC §9. |
 | 2026-09-02 | M0 | `src/data/balance.js` ainda não criado | O M0 não tem número de gameplay — 720×1280, dpr 2 e o clamp de 250 ms são técnicos. Criar o arquivo já com os valores do SPEC §15 seria adiantar M1–M5. O define `__DEV__` já está no build para o `window.BALANCE` entrar no M1. |

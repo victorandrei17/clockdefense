@@ -83,11 +83,13 @@ Centro em `(360, 700)` na resolução lógica — deslocado para baixo, porque o
 | Ponteiro | Velocidade | Alcança | Multiplicador | Disponibilidade |
 |---|---|---|---|---|
 | **Segundos** | 60°/s (volta em 6 s) | ambos os aros | ×1 | sempre |
-| **Minutos** | 15°/s (volta em 24 s) | só aro interno | ×4 | sempre |
+| **Minutos** | 12°/s (volta em 30 s) | só aro interno | ×5 | sempre |
 | **Horas** | 1°/s | nenhum | — | sempre (só indicador) |
 | **Cronógrafo** | arrasto do jogador | ambos os aros | ×2 | desbloqueável |
 
 **Ponteiro das horas = barra de progresso diegética.** Uma hora = 60 s reais = 60° de arco. Seis horas fecham o círculo. Não dispara nada.
+
+**O multiplicador é a razão das voltas, não um número solto.** O ponteiro dos minutos passa por um slot interno 5× menos vezes que o dos segundos (30 s contra 6 s), então vale ×5 — o dano por minuto empata. Se as velocidades forem ajustadas, o multiplicador acompanha: `mult = velocidadeSegundos / velocidadeMinutos`.
 
 ### Detecção de disparo
 
@@ -108,7 +110,28 @@ Se o ponteiro varrer mais de 180° num frame (app voltando do background), **nã
 
 ### Meia-Noite
 
-Quando segundos e minutos ficam a **menos de 3°** um do outro, a coluna sob eles recebe **×3** adicional. Velocidade relativa 45°/s → alinhamento a cada **8 s**, sempre 45° adiante do anterior. Previsível, mas móvel. Marque com clarão âmbar e sino grave.
+Quando segundos e minutos ficam a **menos de 3°** um do outro, a coluna sob eles recebe **×3** adicional. Marque com clarão âmbar e sino grave.
+
+Velocidade relativa 48°/s → alinhamento a cada **7,5 s**, **90° adiante** do anterior. O ciclo fecha em 4 alinhamentos — 30 s, exatamente uma volta do ponteiro dos minutos — e visita sempre as mesmas quatro colunas:
+
+| Coluna | Slot externo | Slot interno |
+|---|---|---|
+| 0° | 0 | 0 |
+| 90° | 3 | — órfã |
+| 180° | 6 | 3 |
+| 270° | 9 | — órfã |
+
+Duas colunas pareadas e duas órfãs. É o que dá motivo para ocupar os slots órfãos, que sem isso seriam só piores; e as duas pareadas viram o terreno nobre do mostrador, porque acumulam Meia-Noite, disparo dos minutos e Corrente.
+
+**O avanço depende só da razão entre os ponteiros, não das velocidades absolutas:**
+
+```
+avanço = 360 · M / (S − M) = 360 / (S/M − 1)
+```
+
+Com `S/M = 5` o avanço é 90°, e `mdc(90, 360) = 90` fixa as quatro colunas. Essa é a razão de o alinhamento cair sempre em cima de slot: **90° é múltiplo dos 30° do aro externo.** Uma razão qualquer não cai — com segundos a 60°/s e minutos a 12°/s, subir só os segundos em 30% leva o avanço a 65,45°, e o alinhamento passa a cair em 11 ângulos dos quais só 1 tem slot. A Meia-Noite simplesmente deixaria de acontecer.
+
+> **Invariante:** qualquer coisa que mude a velocidade dos ponteiros escala **segundos e minutos juntos**, preservando `S/M = 5`. O ponteiro das horas nunca escala — ele é o relógio da partida. Ver §9.
 
 ### Cronógrafo (desbloqueável)
 
@@ -203,7 +226,9 @@ Aparece na virada de cada hora, **com o jogo pausado**. Não há loja em tempo r
 
 - **4 cartas** sorteadas do pool.
 - **Reroll** por 5 engrenagens, +3 a cada uso na mesma visita.
-- Pool: peças disponíveis, upgrades de peças já colocadas, `+10 corda` (15), `+10% velocidade do ponteiro dos segundos` (35, máx 3 por partida).
+- Pool: peças disponíveis, upgrades de peças já colocadas, `+10 corda` (15), `+10% na velocidade do mecanismo` (35, máx 3 por partida).
+
+A carta de velocidade acelera **segundos e minutos juntos**, não só os segundos. Não é detalhe de sabor: acelerar só um dos dois quebra a razão 5:1 e desliga a Meia-Noite (§5). Escalar os dois mantém as quatro colunas onde estão e só aperta a cadência — 7,5 s caem para 5,77 s com as três cartas compradas. O ponteiro das horas fica de fora; ele mede a partida.
 - Botão grande **"Dar corda"** avança para a próxima hora. Nunca avance sozinho.
 
 Carta de upgrade só aparece se a peça correspondente estiver no mostrador. Sem isso a loja enche de lixo.
@@ -399,7 +424,14 @@ BOOT → MENU ⇄ META (desbloqueios)
 ```js
 export const BALANCE = {
   board: { cx: 360, cy: 700, hub: 44, inner: 150, outer: 260, edge: 300, spawn: 400 },
-  hands: { second: 60, minute: 15, hour: 1, chrono: { lerp: 0.25 } },
+  hands: {
+    // mult = second.speed / minute.speed. Ver §5: mexer numa velocidade
+    // sem mexer no multiplicador desbalanceia; mexer na razão mata a Meia-Noite.
+    second: { speed: 60, mult: 1 },
+    minute: { speed: 12, mult: 5 },
+    hour:   { speed: 1 },
+    chrono: { lerp: 0.25, mult: 2 },
+  },
   fire:  { pieceCooldown: 0.35, midnightArc: 3, midnightMult: 3 },
   wind:  { start: 100, drain: 0.4, drainPerHour: 0.1, perKill: 0.3 },
   run:   { hours: 6, hourSeconds: 60 },
