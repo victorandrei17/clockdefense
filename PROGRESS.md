@@ -12,16 +12,65 @@ Estado: `[ ]` pendente · `[~]` em andamento · `[x]` pronto
 
 **Objetivo:** ter algo rodando no celular no primeiro dia.
 
-- [ ] `npm init`, esbuild, scripts `dev` / `build` / `android`
-- [ ] `npm run dev` serve na rede local (`--serve --servedir` com host acessível), não só em localhost
-- [ ] `index.html` com viewport correto, `touch-action: none`, `user-select: none`
-- [ ] Canvas 720×1280 lógico, letterbox, `devicePixelRatio` limitado a 2, `setTransform` global
-- [ ] Loop com timestep fixo 1/60 + acumulador clampado em 250 ms
-- [ ] Contador de FPS no canto
+- [x] `npm init`, esbuild, scripts `dev` / `build` / `android`
+- [x] `npm run dev` serve na rede local (`--serve --servedir` com host acessível), não só em localhost
+- [x] `index.html` com viewport correto, `touch-action: none`, `user-select: none`
+- [x] Canvas 720×1280 lógico, letterbox, `devicePixelRatio` limitado a 2, `setTransform` global
+- [x] Loop com timestep fixo 1/60 + acumulador clampado em 250 ms
+- [x] Contador de FPS no canto
 
 **Pronto quando:** o celular abre a tela pelo IP da máquina e mostra 60 fps estáveis num fundo `#14110E`. Girar o aparelho não quebra o layout.
 
 **Notas:**
+
+Arquivos: `package.json`, `build.mjs`, `index.html`, `src/main.js`, `src/core/loop.js`.
+
+- **Build.** `build.mjs` usa a API JS do esbuild em vez do CLI, porque o mesmo
+  arquivo serve dev e produção. O `index.html` entra como entry point com
+  `loader: { '.html': 'copy' }` — assim o esbuild o copia para `dist/` e o
+  mantém no watch junto com o código. Saída `format: 'iife'`, alvo
+  `es2020` / `chrome80`.
+- **Dev server.** `ctx.serve({ servedir: 'dist', host: '0.0.0.0', port: 8000 })`.
+  O `0.0.0.0` é o que faz o esbuild aceitar conexão do celular e imprimir a
+  URL de rede junto com a local.
+- **`__DEV__`.** Define do esbuild (`true` no dev, `false` no build). O
+  minificador elimina os blocos de dev da produção — conferido: `strokeRect`,
+  `ups` e `window.__RELOGIO__` não aparecem no `dist/bundle.js` de release.
+  É por aqui que o `window.BALANCE` do M1 vai ser exposto.
+- **Escala.** `#stage` é um div com o retângulo do letterbox; canvas e camada
+  de HUD dividem o mesmo rect. `scale = min(vw/720, vh/1280)`, backing store
+  = css × `min(devicePixelRatio, 2)`, e `setTransform(backingW/720, 0, 0,
+  backingH/1280, 0, 0)`. Todo o desenho usa as coordenadas lógicas. Trocar
+  `canvas.width` reseta o contexto, então o `setTransform` vem depois.
+- **HUD.** O contador de FPS é DOM (regra do CLAUDE.md) e só toca o
+  `textContent` quando o texto muda. No dev mostra também `ups` — updates por
+  segundo — que é o que prova que o timestep fixo está rodando a 60 Hz
+  independente do que a tela entrega.
+- **Contorno lógico.** Retângulo de 1 px em latão na borda dos 720×1280, só no
+  dev. Serve para conferir no aparelho se o letterbox está mapeando a área
+  certa. Sai da produção junto com o resto do `__DEV__`.
+- **`orientationchange`.** No WebView do Android o `innerWidth`/`innerHeight`
+  ainda são os antigos quando o evento dispara, então há um `resize` extra
+  agendado 250 ms depois.
+- **`visibilitychange`** só para e recomeça o loop; o `start()` rezera a
+  referência de tempo. A pausa de estado de jogo é do M5, e o reposicionamento
+  de ponteiros sem disparo é do M2.
+- **`npm run android`** existe mas só funciona depois do M10 — o Capacitor
+  ainda não está instalado.
+
+**Verificação.** Chromium headless em viewport de celular (412×892 @ dpr
+2,625), servido pelo dev server:
+
+- 60 fps e 60 ups estáveis; nenhum erro de runtime.
+- Pixel do fundo lido do canvas = `rgb(20,17,14)` = `#14110E`.
+- `devicePixelRatio` real 2,625 → efetivo 2,000 no backing store.
+- Aspecto do palco 0,5628 (720/1280 = 0,5625) em retrato e 0,5631 em paisagem;
+  sem overflow depois de girar.
+- Clamp: travando a thread principal por 2 s, o loop rodou **16** updates. Sem
+  clamp seriam ~120; com o clamp de 250 ms, ~15.
+
+Falta o teste que só o aparelho responde: abrir `npm run dev` pelo IP da
+máquina num Android real e confirmar os 60 fps lá. No emulado passou tudo.
 
 ---
 
@@ -220,4 +269,4 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
-| | | | |
+| 2026-09-02 | M0 | `src/data/balance.js` ainda não criado | O M0 não tem número de gameplay — 720×1280, dpr 2 e o clamp de 250 ms são técnicos. Criar o arquivo já com os valores do SPEC §15 seria adiantar M1–M5. O define `__DEV__` já está no build para o `window.BALANCE` entrar no M1. |
