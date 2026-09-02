@@ -1,4 +1,8 @@
 import { createLoop } from './core/loop.js';
+import { BALANCE } from './data/balance.js';
+import { createClock, advance } from './game/clock.js';
+import { createRenderer } from './render/renderer.js';
+import { LATAO } from './render/palette.js';
 
 // Resolução lógica. Todo desenho usa estas coordenadas; a escala para a tela
 // real é feita uma vez por resize, em setTransform.
@@ -7,15 +11,15 @@ export const VIEW = { w: 720, h: 1280 };
 // WebView de gama média não aguenta 3x. Ver SPEC §2.
 const MAX_DPR = 2;
 
-const BREU = '#14110E';
-const LATAO = '#B08A4A';
-
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game');
 const fpsEl = document.getElementById('fps');
 const ctx = canvas.getContext('2d', { alpha: false });
 
-// Escala palco -> tela. Guardada porque a camada de HUD (DOM) precisa dela.
+const clock = createClock();
+const renderer = createRenderer(ctx, VIEW);
+
+// Escala palco -> tela. O HUD (DOM) e o mostrador pré-renderizado dependem dela.
 let scale = 1;
 
 function resize() {
@@ -38,6 +42,10 @@ function resize() {
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
   ctx.setTransform(canvas.width / VIEW.w, 0, 0, canvas.height / VIEW.h, 0, 0);
+
+  // Px de backing por unidade lógica: é nessa densidade que o mostrador
+  // precisa ser rasterizado para não sair borrado nem serrilhado.
+  renderer.resize(canvas.width / VIEW.w);
 }
 
 let resizePending = false;
@@ -93,13 +101,13 @@ function sampleRate(now) {
 
 // --- Loop ------------------------------------------------------------------
 
-function update() {
+function update(dt) {
   ticks++;
+  advance(clock, dt);
 }
 
 function render() {
-  ctx.fillStyle = BREU;
-  ctx.fillRect(0, 0, VIEW.w, VIEW.h);
+  renderer.frame(clock);
 
   if (__DEV__) {
     // Contorno da área lógica: prova, no aparelho, que o letterbox mapeia
@@ -126,8 +134,9 @@ sampleStart = performance.now();
 loop.start();
 
 if (__DEV__) {
+  window.BALANCE = BALANCE;
   window.__RELOGIO__ = {
-    VIEW, canvas, ctx, loop,
+    VIEW, canvas, ctx, loop, clock, renderer,
     get scale() { return scale; },
     get ticks() { return ticks; },
   };
