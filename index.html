@@ -56,6 +56,24 @@
     pointer-events: none;
   }
 
+  /* Overlay de debug (F1, ou 3 dedos no celular). Ferramenta de trabalho,
+     mantida até o fim do projeto — ver CLAUDE.md. */
+  #debug {
+    position: absolute;
+    top:  calc(10px * var(--ui));
+    left: calc(14px * var(--ui));
+    margin: 0;
+    padding: calc(8px * var(--ui)) calc(10px * var(--ui));
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: calc(13px * var(--ui));
+    line-height: 1.45;
+    white-space: pre;
+    color: var(--osso);
+    background: rgba(10, 8, 6, 0.72);
+    border: 1px solid rgba(176, 138, 74, 0.35);
+    border-radius: calc(3px * var(--ui));
+  }
+
   #fps {
     position: absolute;
     top:   calc(10px * var(--ui));
@@ -73,6 +91,7 @@
     <canvas id="game"></canvas>
     <div id="hud">
       <div id="fps">--</div>
+      <pre id="debug" hidden></pre>
     </div>
   </div>
   <script src="./bundle.js"></script>

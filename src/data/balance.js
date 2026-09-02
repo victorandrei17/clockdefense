@@ -15,4 +15,14 @@ export const BALANCE = {
     hour:   { speed: 1 },
     chrono: { lerp: 0.25, mult: 2 },
   },
+
+  // SPEC §5.
+  fire: {
+    // Único freio anti-abuso do sistema: impede chacoalhar o Cronógrafo em
+    // cima de uma peça. Não remover.
+    pieceCooldown: 0.35,
+    // Separação máxima entre segundos e minutos para valer Meia-Noite.
+    midnightArc: 3,
+    midnightMult: 3,
+  },
 };

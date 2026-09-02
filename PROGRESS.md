@@ -141,19 +141,76 @@ intervalo medido.
 **Objetivo:** provar a mecânica central. Este é o marco mais importante do projeto.
 Referência: SPEC §5.
 
-- [ ] `crossed()` com wraparound, testado nos casos de borda (0°/360°, dt grande)
-- [ ] Cooldown de 0,35 s por peça
-- [ ] Guarda: varredura >180° num frame reposiciona sem disparar
-- [ ] Um Martelo hardcoded no slot interno 0, com feedback visual claro no disparo
-- [ ] Detecção de Meia-Noite (segundos e minutos a <3°) com clarão âmbar
-- [ ] **Overlay de debug** (`F1` no desktop, 3 dedos no celular): ângulos dos ponteiros, hitboxes, alcance das peças, dt, fps, contagem de objetos vivos
-- [ ] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
+- [x] `crossed()` com wraparound, testado nos casos de borda (0°/360°, dt grande)
+- [x] Cooldown de 0,35 s por peça
+- [x] Guarda: varredura >180° num frame reposiciona sem disparar
+- [x] Um Martelo hardcoded no slot interno 0, com feedback visual claro no disparo
+- [x] Detecção de Meia-Noite (segundos e minutos a <3°) com clarão âmbar
+- [x] **Overlay de debug** (`F1` no desktop, 3 dedos no celular): ângulos dos ponteiros, hitboxes, alcance das peças, dt, fps, contagem de objetos vivos
+- [~] Atalhos de debug: pular hora, spawnar inimigo específico, +100 engrenagens, invencibilidade, pausar ponteiros
 
 **Pronto quando:** o Martelo dispara exatamente uma vez por passagem do ponteiro, o cooldown impede disparo duplo em passagens rápidas, e a Meia-Noite acende a cada 7,5 s avançando 90°, fechando o ciclo nas colunas 0°, 90°, 180° e 270° a cada 30 s.
 
 O overlay não é extra. Ele é mantido até o fim do projeto.
 
 **Notas:**
+
+Arquivos novos: `src/data/pieces.data.js`, `src/game/pieces.js`, `src/render/fx.js`,
+`src/render/debug.js`. `crossed()` entrou em `util/math.js`, a Meia-Noite em
+`game/clock.js`, e a seção `fire` no `balance.js`.
+
+- **`crossed()` diverge do snippet do SPEC, e o snippet estava errado.** Com
+  `t <= d` puro, um ponteiro que termina o frame exatamente em cima do alvo
+  dispara duas vezes: uma ao chegar (`t = d`) e outra ao sair (`t = 0`). O
+  intervalo tem que ser aberto em `prev` e fechado em `curr`. E com `d = 0`
+  — ponteiro pausado — o teste dispararia todo frame. SPEC §5 corrigido.
+- **Ordem dos ponteiros importa.** O cooldown é por peça, e na Meia-Noite os
+  dois ponteiros cruzam o mesmo slot interno quase juntos. Testando em ordem
+  decrescente de multiplicador, o ×15 do ponteiro dos minutos vence; testando
+  na ordem oposta, o ×3 dos segundos chegaria primeiro e o pico do jogo
+  sumiria. Regra escrita no SPEC §5.
+- **`midnightAngle` extrapola até o encontro.** A janela de <3° abre ~3,75°
+  antes do alinhamento, então gravar o ângulo do momento marcava a coluna
+  errada por 3°. Agora projeta onde os dois se cruzam: `second + S·gap/(S−M)`.
+  Com isso as colunas saem em 90,00°, 180,00°, 270,00° e 0,00° cravados.
+- **Glow sem `shadowBlur`.** Sprite de gradiente radial em âmbar, construído
+  uma vez, blitado com `globalCompositeOperation = 'lighter'`. Flashes vêm de
+  um array pré-alocado de 32; pool cheio descarta em vez de alocar. O pool
+  genérico de `util/pool.js` entra no M3 com os inimigos.
+- **Overlay em duas camadas.** Números em DOM (atualizado a 10 Hz, e só quando
+  o texto muda); no canvas só geometria — as 4 colunas da Meia-Noite, hitboxes
+  dos slots e alcance das peças. As colunas são derivadas da razão entre os
+  ponteiros, não escritas na mão: se as velocidades mudarem, o overlay segue.
+- **Os listeners do overlay moram em `debug.js`**, não em `core/input.js`. O
+  overlay é dono do próprio gesto de abrir; `input.js` entra no M4, quando
+  houver input de jogo de verdade (arrasto para colocar peça).
+- **Atalhos de debug ficaram em `[~]`.** Só "pausar ponteiros" tem sistema
+  para agir no M2. Pular hora (M5), spawnar inimigo (M3/M6), +100 engrenagens
+  e invencibilidade (M3) entram com os marcos que criam essas coisas —
+  `debug.addShortcut()` já está pronto para recebê-los.
+
+**Verificação.** Chromium headless, com o relógio zerado para o tempo medido
+bater com o tempo de jogo:
+
+- `crossed()`: 25 casos unitários — wraparound em 0°/360°, ponteiro parado,
+  varredura de 179°/180°/200°/350°, sentido anti-horário, e três voltas
+  completas com passo regular e irregular dando exatamente 3 disparos.
+- Meia-Noite em 32 s: **t=7,44 → 90,00°**, **t=14,94 → 180,00°**,
+  **t=22,44 → 270,00°**, **t=29,94 → 0,00°**. Intervalos de 7,50 s cravados,
+  ciclo fechando em 30 s.
+- Martelo: 5 disparos em t = 5,99 / 11,99 / 17,99 / 23,99 / 29,99 s. As quatro
+  primeiras passagens são do ponteiro dos segundos em ×1; em t=30 os dois
+  ponteiros cruzam juntos e sai **um** disparo de **×15** (minutos ×5 ×
+  Meia-Noite ×3). Nenhum par de disparos dentro do cooldown.
+- Overlay: F1 e 3 dedos abrem e fecham; um dedo não abre; `P` congela e
+  solta os ponteiros; o painel mostra todos os campos que o marco pede.
+- Custo do pulso da Meia-Noite: **zero**. Com o pulso ativo sem parar,
+  59,1 fps contra 59,1 fps parado; mediana 16,70 ms, p95 16,90 ms.
+
+Os 32 fps que aparecem no screenshot da Meia-Noite são artefato do próprio
+screenshot, não do efeito — a medição acima foi feita depois, por isso.
+
+`reducedMotion` trocando o pulso por mudança de cor estática é do M9.
 
 ---
 
@@ -315,6 +372,9 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
+| 2026-09-02 | M2 | `crossed()` usa intervalo aberto em `prev` e fechado em `curr`, e devolve false com `d = 0` | O snippet do SPEC (`t <= d`) dispara duas vezes quando o ponteiro termina o frame em cima do alvo, e dispara todo frame com o ponteiro pausado. SPEC §5 corrigido no mesmo commit. |
+| 2026-09-02 | M2 | Ponteiros testados em ordem decrescente de multiplicador | O cooldown é por peça e na Meia-Noite os dois ponteiros cruzam o mesmo slot interno quase juntos. Na ordem errada o ×3 dos segundos chega antes e engole o ×15 dos minutos. Regra acrescentada ao SPEC §5. |
+| 2026-09-02 | M2 | Listeners do overlay em `render/debug.js`, não em `core/input.js` | O overlay é dono do próprio gesto de abrir. Criar `input.js` agora seria um stub que o M4 reescreve quando houver arrasto de peça. |
 | 2026-09-02 | M1 | `src/render/palette.js` criado, fora da estrutura do SPEC §3 | A paleta do §13 é usada por `dial.js` e `renderer.js` e não é número de gameplay, então não cabe em `balance.js`. Um módulo de 6 constantes evita repetir hex em dois arquivos. O `index.html` mantém as mesmas cores como CSS vars para o HUD. |
 | 2026-09-02 | pré-M1 | Ponteiro dos minutos 15°/s → **12°/s**, multiplicador ×4 → **×5** | O SPEC dizia que a Meia-Noite avançava 45° por alinhamento, mas com 15°/s o avanço real é 120°: só 3 colunas recebiam o bônus a partida inteira. `avanço = 360/(S/M − 1)` depende só da razão, e 12°/s dá razão 5, avanço de 90° e as 4 colunas 0°/90°/180°/270° — duas pareadas e duas órfãs. É o único valor inteiro limpo que melhora a cobertura; cobrir as 12 exigiria 300/17 ≈ 17,65°/s e multiplicador 3,4. Ver SPEC §5. |
 | 2026-09-02 | pré-M1 | Carta de loja passa a escalar o mecanismo inteiro, não só os segundos | Com +30% só nos segundos a razão vira 6,5, o avanço vira 65,45° e o alinhamento cai em 11 ângulos dos quais só 1 tem slot — comprar a carta desligava a Meia-Noite. Escalar segundos e minutos juntos preserva a razão e as 4 colunas, e só aperta a cadência (7,5 s → 5,77 s). Ver SPEC §9. |
