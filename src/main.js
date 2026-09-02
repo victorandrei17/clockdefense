@@ -1,7 +1,10 @@
 import { createLoop } from './core/loop.js';
 import { BALANCE } from './data/balance.js';
 import { createClock, advance } from './game/clock.js';
+import { createPiece, updatePieces } from './game/pieces.js';
 import { createRenderer } from './render/renderer.js';
+import { createDebug } from './render/debug.js';
+import { spawnFlash, spawnMidnight, updateFx } from './render/fx.js';
 import { LATAO } from './render/palette.js';
 
 // Resolução lógica. Todo desenho usa estas coordenadas; a escala para a tela
@@ -17,7 +20,12 @@ const fpsEl = document.getElementById('fps');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 const clock = createClock();
+
+// M2: um Martelo fixo no slot interno 0. A colocação pelo jogador é do M4.
+const pieces = [createPiece('hammer', 'inner', 0)];
+
 const renderer = createRenderer(ctx, VIEW);
+const debug = createDebug({ clock, pieces });
 
 // Escala palco -> tela. O HUD (DOM) e o mostrador pré-renderizado dependem dela.
 let scale = 1;
@@ -78,6 +86,8 @@ let shown = '';
 // longo não pode virar uma enxurrada de updates.
 let ticks = 0;
 let ticksAtSample = 0;
+let lastFps = 0;
+let lastUps = 0;
 
 function sampleRate(now) {
   frames++;
@@ -86,6 +96,8 @@ function sampleRate(now) {
 
   const fps = Math.round((frames * 1000) / span);
   const ups = Math.round(((ticks - ticksAtSample) * 1000) / span);
+  lastFps = fps;
+  lastUps = ups;
   frames = 0;
   ticksAtSample = ticks;
   sampleStart = now;
@@ -103,11 +115,25 @@ function sampleRate(now) {
 
 function update(dt) {
   ticks++;
-  advance(clock, dt);
+
+  if (!debug.handsPaused) advance(clock, dt);
+
+  updatePieces(pieces, clock, dt, onFire);
+  if (clock.midnightStarted) spawnMidnight(clock.midnightAngle);
+  updateFx(dt);
+
+  debug.update(dt, lastFps, lastUps);
+}
+
+function onFire(piece, mult) {
+  // Clarão maior quando o multiplicador é maior: dá para ver de longe que
+  // aquele disparo valeu mais.
+  spawnFlash(piece.x, piece.y, 34 + 6 * Math.min(mult, 15));
 }
 
 function render() {
-  renderer.frame(clock);
+  renderer.frame(clock, pieces);
+  debug.draw(ctx);
 
   if (__DEV__) {
     // Contorno da área lógica: prova, no aparelho, que o letterbox mapeia
@@ -136,7 +162,7 @@ loop.start();
 if (__DEV__) {
   window.BALANCE = BALANCE;
   window.__RELOGIO__ = {
-    VIEW, canvas, ctx, loop, clock, renderer,
+    VIEW, canvas, ctx, loop, clock, renderer, pieces, debug,
     get scale() { return scale; },
     get ticks() { return ticks; },
   };

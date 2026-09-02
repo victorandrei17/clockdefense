@@ -25,3 +25,20 @@ export function polar(cx, cy, r, deg) {
   const a = deg * DEG;
   return { x: cx + r * Math.sin(a), y: cy - r * Math.cos(a) };
 }
+
+/**
+ * O ponteiro cruzou `target` ao ir de `prev` para `curr`?
+ *
+ * O intervalo é aberto em `prev` e fechado em `curr`. Sem isso um ponteiro
+ * que para exatamente em cima do alvo dispara duas vezes: uma ao chegar e
+ * outra ao sair no frame seguinte.
+ *
+ * Varredura de 180° ou mais devolve false: é o app voltando do background ou
+ * um dt gigante, e aí o ponteiro só reposiciona, sem disparar (SPEC §5).
+ */
+export function crossed(prev, curr, target, clockwise = true) {
+  const d = clockwise ? norm(curr - prev) : norm(prev - curr);
+  if (d === 0 || d >= 180) return false;
+  const t = clockwise ? norm(target - prev) : norm(prev - target);
+  return t > 0 && t <= d;
+}

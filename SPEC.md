@@ -99,14 +99,19 @@ A cada frame, para cada ponteiro, teste se ele **cruzou** o ângulo de cada slot
 // util/math.js
 export function crossed(prev, curr, target, clockwise = true) {
   const d = clockwise ? norm(curr - prev) : norm(prev - curr);
+  if (d === 0 || d >= 180) return false; // parado, ou dt gigante: reposiciona
   const t = clockwise ? norm(target - prev) : norm(prev - target);
-  return t <= d && d < 180; // d<180 evita falso positivo em dt gigante
+  return t > 0 && t <= d;                // aberto em prev, fechado em curr
 }
 ```
 
 Se o ponteiro varrer mais de 180° num frame (app voltando do background), **não dispare nada** — só reposicione.
 
+O intervalo precisa ser **aberto em `prev` e fechado em `curr`**. Com `t <= d` puro, um ponteiro que termina o frame exatamente em cima do alvo dispara duas vezes: uma ao chegar (`t = d`) e outra ao sair no frame seguinte (`t = 0`). E com `d = 0` — ponteiro parado, seja por pausa ou por `dt` zerado — o teste dispararia todo frame.
+
 **Cooldown por peça: 0,35 s.** Impede que o jogador chacoalhe o Cronógrafo em cima de uma peça e gere dano infinito. É o único freio anti-abuso do sistema.
+
+**Teste os ponteiros em ordem decrescente de multiplicador.** O cooldown é por peça, e durante a Meia-Noite dois ponteiros cruzam o mesmo slot interno com milissegundos de diferença. Testando o de maior multiplicador primeiro, o cooldown nunca engole o disparo grande em favor do pequeno — sem isso o ×15 da Meia-Noite no aro interno viraria ×3, e o pico do jogo dependeria da ordem em que o laço percorre os ponteiros.
 
 ### Meia-Noite
 

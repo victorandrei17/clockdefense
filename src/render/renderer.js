@@ -1,11 +1,32 @@
 // Composição do frame: blit do mostrador estático + ponteiros por cima.
 import { BALANCE as B } from '../data/balance.js';
 import { DEG } from '../util/math.js';
-import { BREU, LATAO, OSSO } from './palette.js';
+import { BREU, LATAO, OSSO, AMBAR } from './palette.js';
 import { createDial } from './dial.js';
+import { drawFx } from './fx.js';
 
 export function createRenderer(ctx, view) {
   const dial = createDial();
+
+  /**
+   * Peça no slot. A arte de verdade é do M4/M9; aqui só precisa ler como
+   * "ocupado" e reagir ao disparo, que é o que o M2 tem de provar.
+   */
+  function piece(p) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
+    ctx.fillStyle = LATAO;
+    ctx.globalAlpha = 0.55 + 0.45 * p.flash;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
+    ctx.strokeStyle = p.flash > 0 ? AMBAR : LATAO;
+    ctx.globalAlpha = 0.7 + 0.3 * p.flash;
+    ctx.lineWidth = 1.5 + 1.5 * p.flash;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 
   /**
    * Desenha um ponteiro por rotação em vez de calcular a ponta: evita alocar
@@ -31,12 +52,14 @@ export function createRenderer(ctx, view) {
       dial.resize(scale);
     },
 
-    frame(clock) {
+    frame(clock, pieces) {
       ctx.fillStyle = BREU;
       ctx.globalAlpha = 1;
       ctx.fillRect(0, 0, view.w, view.h);
 
       dial.draw(ctx);
+
+      for (const p of pieces) piece(p);
 
       // Comprimentos dizem o que cada ponteiro alcança: o das horas morre
       // antes do aro interno porque não dispara nada, o dos minutos passa do
@@ -50,6 +73,8 @@ export function createRenderer(ctx, view) {
       ctx.fillStyle = LATAO;
       ctx.globalAlpha = 1;
       ctx.fill();
+
+      drawFx(ctx);
     },
 
     get dialBuilds() { return dial.builds; },
