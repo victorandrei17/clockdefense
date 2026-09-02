@@ -11,9 +11,15 @@
     --breu:  #14110E;
     --latao: #B08A4A;
     --osso:  #E4DCC8;
+    --ambar: #E8A33D;
+    --ferrugem: #8C3B2A;
     /* Escala do palco (720x1280 lógico -> tela). Definida por main.js. */
     --ui: 1;
   }
+
+  /* O `display` de uma regra nossa vence o display:none que o navegador dá ao
+     atributo hidden. Sem isto, #gameover fica visível a partida inteira. */
+  [hidden] { display: none !important; }
 
   html, body {
     margin: 0;
@@ -56,11 +62,117 @@
     pointer-events: none;
   }
 
+  /* --- HUD do jogo. Texto é DOM e só muda quando o valor muda. --- */
+
+  #topbar {
+    position: absolute;
+    top:   calc(28px * var(--ui));
+    left:  calc(34px * var(--ui));
+    right: calc(34px * var(--ui));
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: calc(24px * var(--ui));
+  }
+
+  .label {
+    font-size: calc(13px * var(--ui));
+    letter-spacing: calc(2px * var(--ui));
+    color: var(--latao);
+    opacity: 0.7;
+  }
+
+  #wind-wrap { flex: 1; max-width: calc(380px * var(--ui)); }
+
+  #wind-track {
+    margin-top: calc(7px * var(--ui));
+    height: calc(10px * var(--ui));
+    background: rgba(176, 138, 74, 0.16);
+    border: 1px solid rgba(176, 138, 74, 0.4);
+    border-radius: calc(5px * var(--ui));
+    overflow: hidden;
+  }
+
+  #wind-fill {
+    height: 100%;
+    width: 100%;
+    background: var(--latao);
+    transition: width 120ms linear;
+  }
+
+  /* A corda baixa é o único alarme do HUD. */
+  #wind-fill.baixa { background: var(--ferrugem); }
+
+  #wind-num {
+    margin-top: calc(5px * var(--ui));
+    font-size: calc(26px * var(--ui));
+    font-variant-numeric: tabular-nums;
+    color: var(--osso);
+  }
+
+  #stats {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: calc(10px * var(--ui));
+  }
+
+  #stats .valor {
+    display: block;
+    margin-top: calc(2px * var(--ui));
+    font-size: calc(22px * var(--ui));
+    font-variant-numeric: tabular-nums;
+    color: var(--osso);
+  }
+
+  #gameover {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(14px * var(--ui));
+    background: rgba(20, 17, 14, 0.88);
+    pointer-events: auto;
+    text-align: center;
+  }
+
+  #gameover h1 {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 500;
+    font-size: calc(44px * var(--ui));
+    color: var(--osso);
+  }
+
+  #gameover p {
+    margin: 0;
+    font-size: calc(19px * var(--ui));
+    color: var(--latao);
+  }
+
+  #restart {
+    margin-top: calc(16px * var(--ui));
+    padding: calc(15px * var(--ui)) calc(38px * var(--ui));
+    min-height: calc(48px * var(--ui));
+    font: inherit;
+    font-size: calc(20px * var(--ui));
+    letter-spacing: calc(1px * var(--ui));
+    color: var(--breu);
+    background: var(--latao);
+    border: 0;
+    border-radius: calc(4px * var(--ui));
+    cursor: pointer;
+  }
+
+  #restart:focus-visible { outline: calc(3px * var(--ui)) solid var(--ambar); outline-offset: calc(3px * var(--ui)); }
+
   /* Overlay de debug (F1, ou 3 dedos no celular). Ferramenta de trabalho,
      mantida até o fim do projeto — ver CLAUDE.md. */
   #debug {
     position: absolute;
-    top:  calc(10px * var(--ui));
+    top:  calc(150px * var(--ui));
     left: calc(14px * var(--ui));
     margin: 0;
     padding: calc(8px * var(--ui)) calc(10px * var(--ui));
@@ -76,8 +188,8 @@
 
   #fps {
     position: absolute;
-    top:   calc(10px * var(--ui));
-    right: calc(14px * var(--ui));
+    bottom: calc(10px * var(--ui));
+    right:  calc(14px * var(--ui));
     font-size: calc(18px * var(--ui));
     font-variant-numeric: tabular-nums;
     letter-spacing: calc(1px * var(--ui));
@@ -90,6 +202,25 @@
   <div id="stage">
     <canvas id="game"></canvas>
     <div id="hud">
+      <div id="topbar">
+        <div id="wind-wrap">
+          <div class="label">CORDA</div>
+          <div id="wind-track"><div id="wind-fill"></div></div>
+          <div id="wind-num">100</div>
+        </div>
+        <div id="stats">
+          <div><span class="label">HORA</span><span class="valor" id="hour">1/6</span></div>
+          <div><span class="label">ENGRENAGENS</span><span class="valor" id="gears">0</span></div>
+        </div>
+      </div>
+
+      <div id="gameover" hidden>
+        <h1>A corda parou</h1>
+        <p id="go-linha1"></p>
+        <p id="go-linha2"></p>
+        <button id="restart" type="button">Dar corda</button>
+      </div>
+
       <div id="fps">--</div>
       <pre id="debug" hidden></pre>
     </div>

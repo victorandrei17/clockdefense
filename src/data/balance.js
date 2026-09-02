@@ -25,4 +25,17 @@ export const BALANCE = {
     midnightArc: 3,
     midnightMult: 3,
   },
+
+  // SPEC §8. A corda drena sozinha: um jogador puramente defensivo perde.
+  wind: { start: 100, drain: 0.4, drainPerHour: 0.1, perKill: 0.3 },
+
+  // SPEC §2. Seis horas de 60 s fecham a volta do ponteiro das horas.
+  run: { hours: 6, hourSeconds: 60 },
+
+  // SPEC §8. Engrenagens por morte. Os outros inimigos entram no M6.
+  gears: { dust: 2 },
+
+  // Provisório do M3: um grupo a cada `interval` segundos. A composição de
+  // verdade das 6 horas vem de `waves.data.js` no M6.
+  spawn: { groupMin: 6, groupMax: 10, interval: 15, firstDelay: 3, dripGap: 0.5 },
 };

@@ -7,6 +7,7 @@
 import { BALANCE as B } from '../data/balance.js';
 import { norm, angleDiff, polar } from '../util/math.js';
 import { untilMidnight } from '../game/clock.js';
+import { drainRate } from '../game/economy.js';
 import { innerSlots, outerSlots } from '../game/board.js';
 import { fxAlive } from './fx.js';
 import { AMBAR, PATINA, OSSO } from './palette.js';
@@ -32,7 +33,7 @@ function midnightColumns() {
 
 const PANEL_HZ = 10; // o painel é diagnóstico, não precisa de 60 fps
 
-export function createDebug({ clock, pieces }) {
+export function createDebug({ clock, pieces, enemies, eco }) {
   const el = document.getElementById('debug');
   const columns = midnightColumns();
   const shortcuts = [];
@@ -97,7 +98,9 @@ export function createDebug({ clock, pieces }) {
         `separação ${Math.abs(angleDiff(clock.second, clock.minute)).toFixed(1).padStart(5)}°  ` +
         (clock.midnight ? 'MEIA-NOITE' : `próxima em ${untilMidnight(clock).toFixed(1)}s`),
         `meia-noites ${clock.midnights}  colunas ${columns.map((c) => `${c}°`).join(' ')}`,
-        `peças ${pieces.length}  efeitos vivos ${fxAlive()}`,
+        `peças ${pieces.length}  inimigos ${enemies.alive()}/${enemies.size}  efeitos ${fxAlive()}`,
+        `corda ${eco.wind.toFixed(1)}  dreno ${drainRate(eco).toFixed(2)}/s  ` +
+        `engr ${eco.gears}  mortes ${eco.kills}${eco.invincible ? '  INVENCÍVEL' : ''}`,
       ];
       if (p) {
         lines.push(
@@ -143,6 +146,13 @@ export function createDebug({ clock, pieces }) {
         ctx.arc(s.x, s.y, 18, 0, Math.PI * 2);
         ctx.stroke();
       }
+
+      // Raio de spawn e do cubo central.
+      ctx.strokeStyle = PATINA;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(cx, cy, B.board.spawn, 0, Math.PI * 2);
+      ctx.stroke();
 
       // Alcance das peças.
       ctx.strokeStyle = OSSO;

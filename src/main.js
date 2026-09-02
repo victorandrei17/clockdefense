@@ -2,6 +2,10 @@ import { createLoop } from './core/loop.js';
 import { BALANCE } from './data/balance.js';
 import { createClock, advance } from './game/clock.js';
 import { createPiece, updatePieces } from './game/pieces.js';
+import { createEnemies, updateEnemies, damage, nearest, spawn } from './game/enemies.js';
+import { createEconomy, tick as tickEconomy, spend, creditKill } from './game/economy.js';
+import { createSpawner, updateSpawner, spawnGroup } from './game/spawner.js';
+import { createHud } from './render/ui/hud.js';
 import { createRenderer } from './render/renderer.js';
 import { createDebug } from './render/debug.js';
 import { spawnFlash, spawnMidnight, updateFx } from './render/fx.js';
@@ -20,12 +24,16 @@ const fpsEl = document.getElementById('fps');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 const clock = createClock();
+const enemies = createEnemies();
+const eco = createEconomy();
+const spawner = createSpawner();
 
 // M2: um Martelo fixo no slot interno 0. A colocação pelo jogador é do M4.
 const pieces = [createPiece('hammer', 'inner', 0)];
 
 const renderer = createRenderer(ctx, VIEW);
-const debug = createDebug({ clock, pieces });
+const hud = createHud();
+const debug = createDebug({ clock, pieces, enemies, eco });
 
 // Escala palco -> tela. O HUD (DOM) e o mostrador pré-renderizado dependem dela.
 let scale = 1;
@@ -116,12 +124,18 @@ function sampleRate(now) {
 function update(dt) {
   ticks++;
 
-  if (!debug.handsPaused) advance(clock, dt);
+  if (eco.alive) {
+    if (!debug.handsPaused) advance(clock, dt);
 
-  updatePieces(pieces, clock, dt, onFire);
-  if (clock.midnightStarted) spawnMidnight(clock.midnightAngle);
+    tickEconomy(eco, dt);
+    updateSpawner(spawner, enemies, dt);
+    updateEnemies(enemies, dt, onReach);
+    updatePieces(pieces, clock, dt, onFire);
+    if (clock.midnightStarted) spawnMidnight(clock.midnightAngle);
+  }
+
   updateFx(dt);
-
+  hud.update(eco);
   debug.update(dt, lastFps, lastUps);
 }
 
@@ -129,10 +143,32 @@ function onFire(piece, mult) {
   // Clarão maior quando o multiplicador é maior: dá para ver de longe que
   // aquele disparo valeu mais.
   spawnFlash(piece.x, piece.y, 34 + 6 * Math.min(mult, 15));
+
+  // Martelo: dano único no inimigo mais próximo dentro do alcance (SPEC §6).
+  const alvo = nearest(enemies, piece.x, piece.y, piece.range);
+  if (!alvo) return;
+  if (damage(enemies, alvo, piece.damage * mult)) {
+    creditKill(eco, alvo.type);
+    spawnFlash(alvo.x, alvo.y, 24);
+  }
+}
+
+/** Inimigo alcançou o cubo: tira da corda e morre no impacto. */
+function onReach(e) {
+  spend(eco, e.damage);
+  spawnFlash(e.x, e.y, 30);
+}
+
+function restart() {
+  Object.assign(eco, createEconomy());
+  Object.assign(spawner, createSpawner());
+  Object.assign(clock, createClock());
+  enemies.clear();
+  for (const p of pieces) { p.cooldown = 0; p.flash = 0; p.shots = 0; p.lastMult = 0; p.lastHand = ''; }
 }
 
 function render() {
-  renderer.frame(clock, pieces);
+  renderer.frame(clock, pieces, enemies);
   debug.draw(ctx);
 
   if (__DEV__) {
@@ -150,6 +186,14 @@ function render() {
 
 const loop = createLoop({ update, render });
 
+hud.onRestart(restart);
+
+// Atalhos que o M2 deixou pendentes, agora que existe sistema para eles agir.
+debug.addShortcut('e', 'spawna Poeira', () => spawnGroup(spawner, enemies));
+debug.addShortcut('g', '+100 engrenagens', () => { eco.gears += 100; });
+debug.addShortcut('i', 'invencibilidade', () => { eco.invincible = !eco.invincible; });
+debug.addShortcut('r', 'reinicia', restart);
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) loop.stop();
   else loop.start();
@@ -163,6 +207,7 @@ if (__DEV__) {
   window.BALANCE = BALANCE;
   window.__RELOGIO__ = {
     VIEW, canvas, ctx, loop, clock, renderer, pieces, debug,
+    enemies, eco, spawner, restart,
     get scale() { return scale; },
     get ticks() { return ticks; },
   };

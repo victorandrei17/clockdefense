@@ -1,12 +1,28 @@
 // Composição do frame: blit do mostrador estático + ponteiros por cima.
 import { BALANCE as B } from '../data/balance.js';
 import { DEG } from '../util/math.js';
-import { BREU, LATAO, OSSO, AMBAR } from './palette.js';
+import { BREU, LATAO, OSSO, AMBAR, FERRUGEM } from './palette.js';
 import { createDial } from './dial.js';
 import { drawFx } from './fx.js';
 
 export function createRenderer(ctx, view) {
   const dial = createDial();
+
+  /** Poeira: um grão irregular vindo da borda. Arte de verdade é do M9. */
+  function enemy(e) {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.drawRadius, 0, Math.PI * 2);
+    ctx.fillStyle = e.hit > 0 ? OSSO : FERRUGEM;
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(e.x - e.drawRadius * 0.3, e.y - e.drawRadius * 0.3, e.drawRadius * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = OSSO;
+    ctx.globalAlpha = 0.18;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   /**
    * Peça no slot. A arte de verdade é do M4/M9; aqui só precisa ler como
@@ -52,12 +68,15 @@ export function createRenderer(ctx, view) {
       dial.resize(scale);
     },
 
-    frame(clock, pieces) {
+    frame(clock, pieces, enemies) {
       ctx.fillStyle = BREU;
       ctx.globalAlpha = 1;
       ctx.fillRect(0, 0, view.w, view.h);
 
       dial.draw(ctx);
+
+      const es = enemies.items;
+      for (let i = 0; i < es.length; i++) if (es[i].active) enemy(es[i]);
 
       for (const p of pieces) piece(p);
 

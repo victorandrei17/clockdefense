@@ -188,6 +188,9 @@ Arquivos novos: `src/data/pieces.data.js`, `src/game/pieces.js`, `src/render/fx.
   para agir no M2. Pular hora (M5), spawnar inimigo (M3/M6), +100 engrenagens
   e invencibilidade (M3) entram com os marcos que criam essas coisas —
   `debug.addShortcut()` já está pronto para recebê-los.
+  **Atualização (M3):** `E` (spawna Poeira), `G` (+100 engrenagens),
+  `I` (invencibilidade) e `R` (reinicia) já entraram. Falta só "pular hora",
+  que depende da estrutura de partida do M5.
 
 **Verificação.** Chromium headless, com o relógio zerado para o tempo medido
 bater com o tempo de jogo:
@@ -219,16 +222,101 @@ screenshot, não do efeito — a medição acima foi feita depois, por isso.
 **Objetivo:** dá pra perder.
 Referência: SPEC §7 (Poeira), §8.
 
-- [ ] `util/pool.js` e pool de inimigos — zero `new` dentro do loop
-- [ ] Poeira: spawn no raio 400, movimento ao centro, HP, morte
-- [ ] Dano ao cubo central e destruição no impacto
-- [ ] Corda: 100 inicial, dreno 0,4/s, +0,3 por morte, game over em 0
-- [ ] Engrenagens somando na morte
-- [ ] HUD em DOM: corda, engrenagens, hora — atualizado só na mudança
+- [x] `util/pool.js` e pool de inimigos — zero `new` dentro do loop
+- [x] Poeira: spawn no raio 400, movimento ao centro, HP, morte
+- [x] Dano ao cubo central e destruição no impacto
+- [x] Corda: 100 inicial, dreno 0,4/s, +0,3 por morte, game over em 0
+- [x] Engrenagens somando na morte
+- [x] HUD em DOM: corda, engrenagens, hora — atualizado só na mudança
 
 **Pronto quando:** sem nenhuma peça a corda zera sozinha e o jogo termina. Com o Martelo do M2, você sobrevive visivelmente mais tempo.
 
+> **A primeira metade do critério passa; a segunda não, e não é ajuste de
+> número — é geometria.** Ver "O critério e um Martelo só", abaixo.
+
 **Notas:**
+
+Arquivos novos: `src/util/pool.js`, `src/data/enemies.data.js`,
+`src/game/enemies.js`, `src/game/economy.js`, `src/game/spawner.js`,
+`src/render/ui/hud.js`. `balance.js` ganhou `wind`, `run`, `gears` e `spawn`.
+
+- **Pool com cursor rotativo.** Tudo alocado no boot; `take()` procura a partir
+  do último índice devolvido em vez de varrer do zero toda vez. Pool cheio
+  descarta o spawn — perder um inimigo vale mais que alocar dentro do loop.
+- **Inimigos em polar.** Guardam `angle` e `radius` e derivam `x`/`y` por
+  frame com `sin`/`cos` direto, sem passar por `polar()`, que devolveria um
+  objeto novo por inimigo por frame. Polar também é o que vai servir ao
+  zigue-zague da Traça e à órbita do Contratempo no M6.
+- **A hora sai do tempo decorrido**, em `economy.js`, só para escalar o dreno
+  e alimentar o HUD. Transição de hora, loja na virada e bônus de fim de hora
+  são do M5.
+- **Grupos espalhados pela volta inteira e pingados.** Duas correções que
+  vieram da medição, não do papel:
+  - A primeira versão soltava cada grupo num arco de 60° com base aleatória.
+    Resultado: em ~5 de 6 partidas nenhum inimigo passava perto do slot 0 e a
+    peça era decorativa. Num tabuleiro circular a pressão tem que vir de todo
+    lado, senão escolher ângulo não significa nada.
+  - A segunda versão nascia com o grupo inteiro no mesmo raio, então os 6 a 10
+    chegavam juntos e tiravam 24–40 de corda num instante. A morte ficava
+    quantizada pela chegada dos grupos: matar dois ou três não mudava o
+    instante da morte. Agora o grupo sai pingado (`dripGap`), e cada morte
+    tira dano de verdade da conta.
+- **`[hidden]` precisou de `!important`.** `#gameover { display: flex }` tem
+  especificidade maior que o `display:none` que o navegador dá ao atributo
+  `hidden`, então o painel de fim de jogo ficava visível a partida inteira. O
+  primeiro teste não pegou porque checava a propriedade `.hidden` em vez da
+  visibilidade real; foi o screenshot que denunciou. Os testes agora conferem
+  `getClientRects()`.
+- **Tela de fim de jogo é provisória.** Um painel com "Dar corda" para
+  reiniciar. A GAMEOVER de verdade é do M5.
+- **Spawner usa `Math.random()`.** Vira mulberry32 semeado no M5, que é
+  quando a partida precisa ser determinística para o save retomar.
+
+**O critério e um Martelo só**
+
+Uma peça cobre uma fatia do mostrador, e a fatia é pequena:
+
+| | cobertura das direções |
+|---|---|
+| alcance 70 no aro interno (r=150) | **15,5%** |
+| alcance 70 no aro externo (r=260) | **8,7%** |
+
+E o ponteiro dos segundos só passa nela a cada 6 s, enquanto um inimigo
+atravessa o alcance em 1 a 5 s dependendo do ângulo — então a peça ainda perde
+cerca de metade do que entra na fatia. Um Martelo mata ~8% do fluxo.
+
+Medido, 150 partidas por linha:
+
+| peças | sobrevive | ganho | mortes | % do fluxo morto |
+|---|---|---|---|---|
+| 0 | 46,9 s | — | 0 | 0% |
+| 1 | 47,9 s | **+2%** | 2 | 8% |
+| 2 | 54,5 s | +16% | 4 | 14% |
+| 3 | 60,9 s | +30% | 7 | 23% |
+| 6 | 77,4 s | +65% | 21 | 49% |
+
+O sistema escala como deveria — o problema é só o número 1. Nenhum ajuste de
+dreno, custo ou volume muda isso, porque o teto é a fração de direções que uma
+peça alcança, e ela não depende do fluxo. Baixar o volume até o dreno dominar
+também não resolve: aí a peça encontra menos alvos ainda.
+
+Isso está de acordo com o resto do design — SPEC §6 chama o Martelo de "linha
+de base", e o CLAUDE.md diz que um jogador puramente defensivo deve perder. Um
+Martelo é o build mais defensivo possível.
+
+**Falta decidir** como o critério deve ficar. As opções são reescrevê-lo para
+um build pequeno (3 Martelos, +30%, é onde a diferença fica óbvia), ou aceitar
++2% como "visível" e seguir. Não mexi no texto do critério porque isso é
+decisão de design, não de implementação.
+
+**Verificação.** Navegador, além da tabela acima:
+
+- HUD começa em corda 100 / hora 1/6 / 0 engrenagens e acompanha a partida.
+- Inimigos nascem no raio 400, nenhum além dele, e andam para o centro.
+- A corda drena sozinha; o painel de fim de jogo aparece **de verdade** em 0,
+  os ponteiros param, e "Dar corda" reinicia zerando o pool.
+- Atalhos `E`, `G`, `I` e `R` funcionando; invencibilidade para o dreno.
+- Pool nunca passa do tamanho; sem erros de runtime.
 
 ---
 
@@ -372,6 +460,8 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
+| 2026-09-02 | M3 | Grupos de Poeira nascem espalhados pela volta inteira e pingados, não num arco fechado nem todos de uma vez | Em arco estreito a utilidade de cada peça vira loteria: medindo, em ~5 de 6 partidas nenhum inimigo passava perto do slot com Martelo. Nascendo todos no mesmo raio, chegam juntos e a morte fica quantizada pela chegada dos grupos, o que zera o efeito de matar dois ou três. |
+| 2026-09-02 | M3 | Tela de fim de jogo provisória com botão "Dar corda" | O critério do M3 exige comparar duas partidas; sem reinício isso vira recarregar a página a cada teste. A GAMEOVER de verdade é do M5. |
 | 2026-09-02 | M2 | `crossed()` usa intervalo aberto em `prev` e fechado em `curr`, e devolve false com `d = 0` | O snippet do SPEC (`t <= d`) dispara duas vezes quando o ponteiro termina o frame em cima do alvo, e dispara todo frame com o ponteiro pausado. SPEC §5 corrigido no mesmo commit. |
 | 2026-09-02 | M2 | Ponteiros testados em ordem decrescente de multiplicador | O cooldown é por peça e na Meia-Noite os dois ponteiros cruzam o mesmo slot interno quase juntos. Na ordem errada o ×3 dos segundos chega antes e engole o ×15 dos minutos. Regra acrescentada ao SPEC §5. |
 | 2026-09-02 | M2 | Listeners do overlay em `render/debug.js`, não em `core/input.js` | O overlay é dono do próprio gesto de abrir. Criar `input.js` agora seria um stub que o M4 reescreve quando houver arrasto de peça. |
