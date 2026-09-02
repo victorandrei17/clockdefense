@@ -52,7 +52,8 @@ export const BALANCE = {
   // SPEC §6. Cargas do Contrapeso e devolução da venda.
   pieces: { chargePerSecond: 1, sellRatio: 0.5 },
 
-  // Provisório do M3: um grupo a cada `interval` segundos. A composição de
-  // verdade das 6 horas vem de `waves.data.js` no M6.
-  spawn: { groupMin: 6, groupMax: 10, interval: 15, firstDelay: 3, dripGap: 0.5 },
+  // O orçamento de cada hora está em `waves.data.js`. Aqui só a cadência.
+  // `tailSeconds` é a folga no fim da hora: sem ela o último inimigo nasceria
+  // faltando menos tempo do que leva para chegar ao centro.
+  spawn: { firstDelay: 2, tailSeconds: 14 },
 };

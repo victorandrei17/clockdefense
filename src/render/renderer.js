@@ -108,6 +108,20 @@ export function createRenderer(ctx, view) {
   function piece(p) {
     if (p.type === 'chain') chainLink(p);
 
+    // Alcance sempre visível, bem apagado. A habilidade do jogo é cobrir o
+    // mostrador, e sem isto não dá para ver onde estão os buracos por onde
+    // os inimigos passam.
+    const alcance = PIECES[p.type].range;
+    if (alcance > 0) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, alcance, 0, Math.PI * 2);
+      ctx.strokeStyle = LATAO;
+      ctx.globalAlpha = 0.09 + 0.12 * p.flash;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     // Zona da Ampulheta nível 3, enquanto está de pé.
     if (p.zoneTime > 0) {
       ctx.beginPath();

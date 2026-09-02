@@ -4,7 +4,7 @@ import { createClock, advance } from './game/clock.js';
 import { createPiece, updatePieces, canPlace, pieceAt, upgrade, upgradeCost, sellValue } from './game/pieces.js';
 import { createEnemies, updateEnemies, damage } from './game/enemies.js';
 import { createEconomy, tick as tickEconomy, spend, creditKill, pay, refund, gainWindMax } from './game/economy.js';
-import { createSpawner, updateSpawner, spawnGroup } from './game/spawner.js';
+import { createSpawner, updateSpawner, spawnGroup, startHour } from './game/spawner.js';
 import { createHud } from './render/ui/hud.js';
 import { createPanel } from './render/ui/panel.js';
 import { createPopover } from './render/ui/popover.js';
@@ -228,6 +228,7 @@ function comecar() {
   shopUi.fechar();
   screens.esconderFim();
   screens.mostrarMenu(false);
+  startHour(spawner, run.hour);
   run.phase = 'run';
 }
 
@@ -253,6 +254,7 @@ function seguir() {
     return;
   }
   nextHour(run);
+  startHour(spawner, run.hour);
   run.phase = 'run';
 }
 

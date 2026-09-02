@@ -145,7 +145,10 @@ const EFFECTS = {
 
 /** Uma peça sem alvo nenhum ainda gasta o disparo. É assim de propósito. */
 export function updatePieces(pieces, clock, dt, world) {
-  const w = { ...world, midnight: clock.midnight };
+  // `hits` conta acertos deste frame, para saber se o disparo encontrou algo.
+  const w = { ...world, midnight: clock.midnight, hits: 0 };
+  const hitOriginal = world.hit;
+  w.hit = (e, d) => { w.hits++; hitOriginal(e, d); };
 
   for (const p of pieces) {
     const st = stats(p);
@@ -182,14 +185,18 @@ export function updatePieces(pieces, clock, dt, world) {
       const mult = h.mult * (clock.midnight ? B.fire.midnightMult : 1);
 
       p.cooldown = B.fire.pieceCooldown;
-      p.flash = 1;
       p.shots++;
       p.lastMult = mult;
       p.lastHand = h.key;
-      // Clarão maior quando o multiplicador é maior: dá para ver de longe
-      // que aquele disparo valeu mais.
-      w.flash(p.x, p.y, 34 + 6 * Math.min(mult, 15));
+
+      // Passagem em falso tem de parecer passagem em falso. Antes toda
+      // passagem acendia igual, e como ~5 de 6 não encontram alvo, o jogo
+      // parecia disparar sem matar. Agora o clarão cheio é só de quem acerta.
+      const antes = w.hits;
       EFFECTS[p.type](p, st, mult, w);
+      const acertou = w.hits > antes;
+      p.flash = acertou ? 1 : 0.25;
+      if (acertou) w.flash(p.x, p.y, 34 + 6 * Math.min(mult, 15));
       break; // uma peça dispara uma vez por frame
     }
   }

@@ -1,52 +1,51 @@
 // Spawner. SPEC §7.
 //
-// Provisório do M3: grupos de Poeira em intervalo fixo, ângulo aleatório.
-// A composição das 6 horas vem de `waves.data.js` no M6, e o Math.random()
-// daqui vira o mulberry32 semeado do M5 — a partida precisa ser determinística
-// para o save conseguir retomar.
+// A hora tem um orçamento de inimigos (`waves.data.js`) espalhado por ela,
+// não um intervalo fixo. Com intervalo fixo, o que decidia a dificuldade era
+// se a última leva chegava antes de a hora fechar — um degrau que não tinha
+// relação com o jogo.
+//
+// O Math.random() daqui vira o mulberry32 semeado quando o save precisar
+// retomar uma partida (M8).
 
 import { BALANCE as B } from '../data/balance.js';
+import { waveOf } from '../data/waves.data.js';
 import { spawn } from './enemies.js';
 
 export function createSpawner() {
-  return { next: B.spawn.firstDelay, groups: 0, pending: 0, drip: 0, angle: 0, step: 0 };
+  return { restam: 0, gap: 0, prox: 0, angulo: 0, passo: 0 };
+}
+
+/** Começa a hora: distribui o orçamento pelo tempo dela. */
+export function startHour(sp, hour) {
+  const n = waveOf(hour).dust;
+  sp.restam = n;
+  // Deixa uma folga no fim para o último inimigo ainda chegar ao centro.
+  const janela = B.run.hourSeconds - B.spawn.tailSeconds;
+  sp.gap = janela / n;
+  sp.prox = B.spawn.firstDelay;
+  // Espalhado pela volta inteira: num tabuleiro circular a pressão vem de
+  // todo lado, senão escolher ângulo não significa nada.
+  sp.angulo = Math.random() * 360;
+  // Passo irracional em relação a 360 para os ângulos não se repetirem cedo.
+  sp.passo = 360 * 0.61803398875;
 }
 
 export function updateSpawner(sp, pool, dt) {
-  // Solta o grupo pingado em vez de todo de uma vez. Nascendo juntos, os 6 a
-  // 10 chegam juntos e tiram 24-40 de corda num instante só: a partida vira
-  // sobreviver a picos, e matar dois ou três não muda nada porque o pico vem
-  // igual. Pingado, cada morte tira dano de verdade da conta.
-  if (sp.pending > 0) {
-    sp.drip -= dt;
-    if (sp.drip <= 0) {
-      sp.drip += B.spawn.dripGap;
-      sp.pending--;
-      const jitter = (Math.random() - 0.5) * sp.step * 0.6;
-      spawn(pool, 'dust', sp.angle + jitter);
-      sp.angle += sp.step;
-    }
-  }
-
-  sp.next -= dt;
-  if (sp.next > 0) return;
-  sp.next += B.spawn.interval;
-  spawnGroup(sp, pool);
+  if (sp.restam <= 0) return;
+  sp.prox -= dt;
+  if (sp.prox > 0) return;
+  sp.prox += sp.gap;
+  sp.restam--;
+  const jitter = (Math.random() - 0.5) * 40;
+  spawn(pool, 'dust', sp.angulo + jitter);
+  sp.angulo += sp.passo;
 }
 
-/** Engatilha um grupo. Os inimigos saem pingados por `updateSpawner`. */
-export function spawnGroup(sp, pool) {
-  const { groupMin, groupMax } = B.spawn;
-  const n = groupMin + Math.floor(Math.random() * (groupMax - groupMin + 1));
-
-  // Espalhado pela volta inteira. Concentrar o grupo num arco estreito faz a
-  // utilidade de cada peça virar loteria: em metade das partidas nenhum
-  // inimigo passa perto dela. Num tabuleiro circular a pressão vem de todo
-  // lado — é isso que dá sentido a escolher ângulo.
-  sp.pending = n;
-  sp.drip = 0;
-  sp.angle = Math.random() * 360;
-  sp.step = 360 / n;
-  sp.groups++;
+/** Solta um punhado agora. Só para o atalho de debug. */
+export function spawnGroup(sp, pool, n = 8) {
+  for (let i = 0; i < n; i++) {
+    spawn(pool, 'dust', Math.random() * 360);
+  }
   return n;
 }
