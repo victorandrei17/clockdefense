@@ -229,10 +229,11 @@ Referência: SPEC §7 (Poeira), §8.
 - [x] Engrenagens somando na morte
 - [x] HUD em DOM: corda, engrenagens, hora — atualizado só na mudança
 
-**Pronto quando:** sem nenhuma peça a corda zera sozinha e o jogo termina. Com o Martelo do M2, você sobrevive visivelmente mais tempo.
+**Pronto quando:** sem nenhuma peça a corda zera sozinha e o jogo termina. Com três Martelos, você sobrevive visivelmente mais tempo.
 
-> **A primeira metade do critério passa; a segunda não, e não é ajuste de
-> número — é geometria.** Ver "O critério e um Martelo só", abaixo.
+> Critério reescrito em 2026-09-02: era "com o Martelo do M2". Uma peça só dá
+> +2%, e o teto é geométrico, não de balanceamento — ver "Por que três, e não
+> um", abaixo.
 
 **Notas:**
 
@@ -272,7 +273,7 @@ Arquivos novos: `src/util/pool.js`, `src/data/enemies.data.js`,
 - **Spawner usa `Math.random()`.** Vira mulberry32 semeado no M5, que é
   quando a partida precisa ser determinística para o save retomar.
 
-**O critério e um Martelo só**
+**Por que três, e não um**
 
 Uma peça cobre uma fatia do mostrador, e a fatia é pequena:
 
@@ -290,10 +291,14 @@ Medido, 150 partidas por linha:
 | peças | sobrevive | ganho | mortes | % do fluxo morto |
 |---|---|---|---|---|
 | 0 | 46,9 s | — | 0 | 0% |
-| 1 | 47,9 s | **+2%** | 2 | 8% |
+| 1 | 47,9 s | +2% | 2 | 8% |
 | 2 | 54,5 s | +16% | 4 | 14% |
-| 3 | 60,9 s | +30% | 7 | 23% |
+| **3** | **60,9 s** | **+30%** | **7** | **23%** |
 | 6 | 77,4 s | +65% | 21 | 49% |
+
+Agrupados (slots 0, 1, 2) ou espalhados (0, 2, 4) dá o mesmo +30%: as fatias
+não se sobrepõem em nenhum dos dois arranjos, então a cobertura é aditiva. O
+demo usa os espalhados, que leem melhor na tela.
 
 O sistema escala como deveria — o problema é só o número 1. Nenhum ajuste de
 dreno, custo ou volume muda isso, porque o teto é a fração de direções que uma
@@ -304,10 +309,10 @@ Isso está de acordo com o resto do design — SPEC §6 chama o Martelo de "linh
 de base", e o CLAUDE.md diz que um jogador puramente defensivo deve perder. Um
 Martelo é o build mais defensivo possível.
 
-**Falta decidir** como o critério deve ficar. As opções são reescrevê-lo para
-um build pequeno (3 Martelos, +30%, é onde a diferença fica óbvia), ou aceitar
-+2% como "visível" e seguir. Não mexi no texto do critério porque isso é
-decisão de design, não de implementação.
+**Decidido:** o critério passou a falar de três Martelos, e o demo do M3 põe
+três nos slots internos 0, 2 e 4. +30% é diferença que se vê jogando, sem
+mexer em nenhum número de balanceamento. O M4 substitui isso por colocação
+de verdade.
 
 **Verificação.** Navegador, além da tabela acima:
 
@@ -316,6 +321,8 @@ decisão de design, não de implementação.
 - A corda drena sozinha; o painel de fim de jogo aparece **de verdade** em 0,
   os ponteiros param, e "Dar corda" reinicia zerando o pool.
 - Atalhos `E`, `G`, `I` e `R` funcionando; invencibilidade para o dreno.
+- Com os três Martelos do demo: 60,9 s de mediana contra 46,9 s sem peça
+  nenhuma, em 300 partidas de cada.
 - Pool nunca passa do tamanho; sem erros de runtime.
 
 ---
@@ -460,6 +467,7 @@ Anote aqui tudo que divergir do `SPEC.md`, com o motivo. Se a divergência for p
 
 | Data | Marco | Decisão | Motivo |
 |---|---|---|---|
+| 2026-09-02 | M3 | Critério do M3 reescrito de "com o Martelo" para "com três Martelos", e o demo passou a ter 3 | Uma peça de alcance 70 cobre 15,5% das direções no aro interno e perde metade do que entra, então mata ~8% do fluxo: +2% de sobrevivência, invisível jogando. O teto é geométrico e independe do volume de inimigos, dreno ou custo — nenhum ajuste de balanceamento o move. Três dão +30%. Alternativa descartada: subir o alcance para ~110, que deixaria o Martelo dominante e criaria justamente o "compre mais martelos" que o SPEC §6 quer evitar. |
 | 2026-09-02 | M3 | Grupos de Poeira nascem espalhados pela volta inteira e pingados, não num arco fechado nem todos de uma vez | Em arco estreito a utilidade de cada peça vira loteria: medindo, em ~5 de 6 partidas nenhum inimigo passava perto do slot com Martelo. Nascendo todos no mesmo raio, chegam juntos e a morte fica quantizada pela chegada dos grupos, o que zera o efeito de matar dois ou três. |
 | 2026-09-02 | M3 | Tela de fim de jogo provisória com botão "Dar corda" | O critério do M3 exige comparar duas partidas; sem reinício isso vira recarregar a página a cada teste. A GAMEOVER de verdade é do M5. |
 | 2026-09-02 | M2 | `crossed()` usa intervalo aberto em `prev` e fechado em `curr`, e devolve false com `d = 0` | O snippet do SPEC (`t <= d`) dispara duas vezes quando o ponteiro termina o frame em cima do alvo, e dispara todo frame com o ponteiro pausado. SPEC §5 corrigido no mesmo commit. |

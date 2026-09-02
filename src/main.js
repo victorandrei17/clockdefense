@@ -28,8 +28,11 @@ const enemies = createEnemies();
 const eco = createEconomy();
 const spawner = createSpawner();
 
-// M2: um Martelo fixo no slot interno 0. A colocação pelo jogador é do M4.
-const pieces = [createPiece('hammer', 'inner', 0)];
+// Martelos fixos nos slots internos 0, 2 e 4 — 120° um do outro. Três porque
+// uma peça só cobre 15,5% das direções e não muda a partida de forma
+// perceptível; ver a tabela no M3 do PROGRESS.md. A colocação pelo jogador
+// é do M4.
+const pieces = [0, 2, 4].map((slot) => createPiece('hammer', 'inner', slot));
 
 const renderer = createRenderer(ctx, VIEW);
 const hud = createHud();
